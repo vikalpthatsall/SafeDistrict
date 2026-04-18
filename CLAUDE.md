@@ -52,3 +52,48 @@ Copy `.env` and populate required keys (e.g. `ANTHROPIC_API_KEY`, vector DB cred
 - The agent in `agent.py` uses the Anthropic SDK. Use `claude-sonnet-4-6` (or newer) as the default model and enable prompt caching on system prompts where applicable.
 - RAG retrieval results feed directly into the agent's tool-use loop; keep the boundary clean — `rag_pipeline.py` returns ranked documents, `agent.py` decides how to use them.
 - `anomaly_engine.py` should expose a single callable interface (e.g. `detect(df) -> list[Anomaly]`) so `agent.py` can call it as a tool without importing ML internals.
+
+## Session Rules (read before every task)
+
+- Work on ONE file per session only. Do not touch other files unprompted.
+- Always confirm the task is complete before ending a session.
+- Never install libraries not listed in requirements.txt without asking first.
+- If an error repeats more than twice, stop and explain why instead of retrying.
+
+## Tech Stack (do not deviate from this)
+
+- Python 3.11+
+- Data: pandas, numpy, scikit-learn
+- AI/LLM: langchain, langchain-anthropic, anthropic
+- Vector DB: chromadb
+- API: fastapi, uvicorn, pydantic
+- Frontend: streamlit, plotly
+- Model: claude-sonnet-4-6 (never use opus unless explicitly told)
+- Environment: python-dotenv for loading .env
+
+## Project Purpose
+
+SafeDistrict AI helps users compare crime safety across Indian districts
+using NCRB data. Users ask natural language questions like "is Pune safer
+than Nagpur for women?" and get data-backed answers. Target users are
+people relocating within India.
+
+## Current Build Status
+
+- [x] Session 1: data_loader.py ✓ COMPLETE
+- [ ] Session 2: anomaly_engine.py
+- [ ] Session 3: rag_pipeline.py
+- [ ] Session 4: agent.py
+- [ ] Session 5: main.py (FastAPI)
+- [ ] Session 6: app.py (Streamlit)
+
+## Data
+
+- Synthetic NCRB-style data generated in data_loader.py
+- Real NCRB CSVs go in data/raw/ when available
+- Key columns: district, state, year, murder, rape, kidnapping,
+  robbery, burglary, vehicle_theft, total_cognizable_ipc, crimes_per_lakh
+
+## Environment Variables (.env)
+
+ANTHROPIC_API_KEY=your_key_here
