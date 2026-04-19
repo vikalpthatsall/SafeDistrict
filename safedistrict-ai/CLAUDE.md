@@ -82,7 +82,7 @@ people relocating within India.
 
 - [x] Session 1: data_loader.py ✓ COMPLETE (real NCRB 2023 data, 53 cities)
 - [x] Session 2: anomaly_engine.py ✓ COMPLETE (6 anomalies, safety scores, women risk)
-- [ ] Session 3: rag_pipeline.py
+- [x] Session 3: rag_pipeline.py ✓ COMPLETE (ChromaDB, HuggingFace embeddings, Groq Llama)
 - [ ] Session 4: agent.py
 - [ ] Session 5: main.py (FastAPI)
 - [ ] Session 6: app.py (Streamlit)
