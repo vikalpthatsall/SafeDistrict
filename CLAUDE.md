@@ -84,7 +84,7 @@ people relocating within India.
 - [x] Session 2: anomaly_engine.py ✓ COMPLETE (anomaly detection, safety scores)
 - [x] Session 3: rag_pipeline.py ✓ COMPLETE (ChromaDB, HuggingFace, Groq Llama)
 - [x] Session 4: agent.py ✓ COMPLETE (routing, 4 query types, city reports)
-- [ ] Session 5: main.py (FastAPI)
+- [x] Session 5: main.py ✓ COMPLETE (10 endpoints, all tested and working)
 - [ ] Session 6: app.py (Streamlit)
 
 ## Data

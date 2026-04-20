@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(python *)",
-      "Bash(Remove-Item *)"
+      "Bash(Remove-Item *)",
+      "Bash(curl -s \"http://localhost:8000/anomalies\")",
+      "Bash(curl -s \"http://localhost:8000/top-dangerous?n=3\")",
+      "Bash(curl -s \"http://localhost:8000/women-safety\")",
+      "Bash(curl -s -X POST http://localhost:8000/compare -H \"Content-Type: application/json\" -d \"{\\\\\"city1\\\\\":\\\\\"Mumbai\\\\\",\\\\\"city2\\\\\":\\\\\"Pune\\\\\",\\\\\"aspect\\\\\":\\\\\"overall safety\\\\\"}\")"
     ]
   }
 }
