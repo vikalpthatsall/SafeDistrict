@@ -81,9 +81,9 @@ people relocating within India.
 ## Current Build Status
 
 - [x] Session 1: data_loader.py ✓ COMPLETE (real NCRB 2023 data, 53 cities)
-- [x] Session 2: anomaly_engine.py ✓ COMPLETE (6 anomalies, safety scores, women risk)
-- [ ] Session 3: rag_pipeline.py
-- [ ] Session 4: agent.py
+- [x] Session 2: anomaly_engine.py ✓ COMPLETE (anomaly detection, safety scores)
+- [x] Session 3: rag_pipeline.py ✓ COMPLETE (ChromaDB, HuggingFace, Groq Llama)
+- [x] Session 4: agent.py ✓ COMPLETE (routing, 4 query types, city reports)
 - [ ] Session 5: main.py (FastAPI)
 - [ ] Session 6: app.py (Streamlit)
 
