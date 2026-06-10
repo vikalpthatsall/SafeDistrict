@@ -1,0 +1,13 @@
+{
+  "backend\\agent.py": 1776497250.961823,
+  "backend\\anomaly_engine.py": 1776517000.0117857,
+  "backend\\data_loader.py": 1776513425.4509976,
+  "backend\\main.py": 1776497250.9655814,
+  "backend\\rag_pipeline.py": 1776497250.9514966,
+  "frontend\\app.py": 1776497318.8435247,
+  "CLAUDE.md": 1776517789.4488096,
+  "README.md": 1776497318.8933327,
+  "requirements.txt": 1776517496.7288475,
+  "graphify-out\\converted\\ipc_crimes_citywise_2023_e2adea79.md": 1776593010.943683,
+  "safedistrict-ai\\CLAUDE.md": 1776517682.7528167
+}

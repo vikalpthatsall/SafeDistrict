@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(Remove-Item *)",
+      "Bash(curl -s \"http://localhost:8000/anomalies\")",
+      "Bash(curl -s \"http://localhost:8000/top-dangerous?n=3\")",
+      "Bash(curl -s \"http://localhost:8000/women-safety\")",
+      "Bash(curl -s -X POST http://localhost:8000/compare -H \"Content-Type: application/json\" -d \"{\\\\\"city1\\\\\":\\\\\"Mumbai\\\\\",\\\\\"city2\\\\\":\\\\\"Pune\\\\\",\\\\\"aspect\\\\\":\\\\\"overall safety\\\\\"}\")",
+      "Bash(curl -s \"http://localhost:8000/cities\")",
+      "Bash(curl -s \"http://localhost:8000/cities/Agra\")",
+      "Bash(curl -s \"http://localhost:8000/states\")",
+      "Bash(curl -s \"http://localhost:8000/states/Maharashtra/cities\")",
+      "Bash(curl -s \"http://localhost:8000/top-dangerous?n=5\")",
+      "Bash(curl -s -X POST \"http://localhost:8000/compare\" -H \"Content-Type: application/json\" -d '{\"city1\":\"Mumbai\",\"city2\":\"Delhi\",\"aspect\":\"overall safety\"}')",
+      "Bash(curl -s -X POST \"http://localhost:8000/query\" -H \"Content-Type: application/json\" -d '{\"question\":\"Is Delhi safe?\"}')",
+      "Bash(curl -s -X POST \"http://localhost:8000/compare\" -H \"Content-Type: application/json\" -d '{\"city1\":\"Mumbai\",\"city2\":\"Pune\",\"aspect\":\"overall safety\"}')",
+      "Bash(.venv\\\\Scripts\\\\python.exe *)",
+      "PowerShell(pip install *)",
+      "PowerShell(python -m pip install -r \"C:\\\\Users\\\\Biraj Kumar\\\\Downloads\\\\SafeDistrict-main\\\\SafeDistrict-main\\\\requirements.txt\" 2>&1)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(py *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(irm https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1 | iex)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Biraj Kumar\\\\.claude\\\\plugins\\\\\" -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object FullName | Format-List)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Biraj Kumar\\\\.claude\\\\plugins\\\\cache\\\\caveman\\\\caveman\\\\655b7d9c5431\\\\.claude-plugin\\\\\" -Recurse | ForEach-Object { Write-Host \"=== $\\($_.FullName\\) ===\"; if \\(!$_.PSIsContainer\\) { Get-Content $_.FullName } })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Biraj Kumar\\\\.claude\\\\plugins\\\\marketplaces\\\\caveman\\\\\" -Recurse -Filter \"plugin.json\" | ForEach-Object { Write-Host \"=== $\\($_.FullName\\) ===\"; Get-Content $_.FullName })"
+    ]
+  }
+}

@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeDistrict — Design Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600&family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Tokens ────────────────────────────────────── */
+    :root {
+      --font-d: 'Bricolage Grotesque', sans-serif;
+      --font-b: 'Manrope', sans-serif;
+      --font-m: 'JetBrains Mono', monospace;
+      --r: 6px;
+      --r-lg: 10px;
+      --nav-h: 54px;
+      --max: 1240px;
+      --px: 32px;
+    }
+    [data-theme="dark"] {
+      --bg:       #0d0d10;
+      --surf:     #131318;
+      --surf2:    #1a1a22;
+      --bdr:      #252530;
+      --bdr-s:    #1c1c26;
+      --tx:       #e8e8f0;
+      --tx2:      #8888aa;
+      --tx3:      #505068;
+      --danger:   #e84040;
+      --warn:     #e8a020;
+      --safe:     #20c8a0;
+      --sel-arr:  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2368688a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    [data-theme="light"] {
+      --bg:       #f4f4f7;
+      --surf:     #ffffff;
+      --surf2:    #ebebf3;
+      --bdr:      #d6d6e6;
+      --bdr-s:    #e5e5f0;
+      --tx:       #0d0d10;
+      --tx2:      #56566e;
+      --tx3:      #a0a0b8;
+      --danger:   #c82020;
+      --warn:     #a05c10;
+      --safe:     #008860;
+      --sel-arr:  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2356566e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+
+    /* ── Reset ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--tx);
+      font-family: var(--font-b);
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+      transition: background .2s, color .2s;
+      text-wrap: pretty;
+    }
+
+    /* ── Nav ────────────────────────────────────────── */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      height: var(--nav-h);
+      background: var(--bg);
+      border-bottom: 1px solid var(--bdr-s);
+      display: flex; align-items: center;
+      padding: 0 var(--px);
+      transition: background .2s, border-color .2s;
+    }
+    .nav-logo {
+      font-family: var(--font-d);
+      font-size: 16px; font-weight: 500;
+      color: var(--tx); letter-spacing: -.015em;
+      user-select: none; flex-shrink: 0;
+    }
+    .nav-logo .dim { color: var(--tx3); }
+    .nav-tabs {
+      display: flex; align-items: stretch;
+      margin-left: 36px; flex: 1; height: 100%;
+    }
+    .nav-tab {
+      display: flex; align-items: center; height: 100%;
+      padding: 0 15px;
+      font-size: 13px; font-weight: 500;
+      color: var(--tx2); cursor: pointer;
+      border: none; background: none;
+      font-family: var(--font-b);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .12s, border-color .12s;
+      letter-spacing: -.01em; white-space: nowrap;
+    }
+    .nav-tab:hover { color: var(--tx); }
+    .nav-tab.active { color: var(--tx); border-bottom-color: var(--tx); }
+    .nav-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .badge-proto {
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .07em; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 3px;
+      background: var(--surf2); color: var(--tx3);
+      border: 1px solid var(--bdr);
+    }
+    .theme-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1px solid var(--bdr); background: var(--surf);
+      color: var(--tx2); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .12s;
+    }
+    .theme-btn:hover { border-color: var(--tx2); color: var(--tx); }
+    .theme-btn svg { display: block; }
+
+    /* ── Page ───────────────────────────────────────── */
+    .page { display: none; max-width: var(--max); margin: 0 auto; padding: 40px var(--px) 72px; }
+    .page.active { display: block; }
+
+    /* ── Page header ────────────────────────────────── */
+    .ph { margin-bottom: 34px; }
+    .ph-title {
+      font-family: var(--font-d);
+      font-size: 30px; font-weight: 400;
+      letter-spacing: -.025em; line-height: 1.1;
+      color: var(--tx); margin-bottom: 9px;
+    }
+    .ph-meta {
+      font-size: 13px; color: var(--tx2);
+      display: flex; align-items: center;
+      gap: 10px; flex-wrap: wrap;
+    }
+    .dot { width: 2px; height: 2px; border-radius: 50%; background: var(--tx3); flex-shrink: 0; }
+
+    /* ── Section label ──────────────────────────────── */
+    .sl {
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--tx3); margin-bottom: 14px;
+    }
+
+    /* ── Grids ──────────────────────────────────────── */
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 760px) { .g2 { grid-template-columns: 1fr; } }
+
+    /* ── Panel ──────────────────────────────────────── */
+    .panel {
+      background: var(--surf);
+      border: 1px solid var(--bdr-s);
+      border-radius: var(--r-lg);
+      padding: 22px;
+    }
+
+    /* ── Chart ──────────────────────────────────────── */
+    .chart-box { position: relative; height: 300px; }
+    .chart-note {
+      font-size: 11px; color: var(--tx3);
+      margin-top: 12px; line-height: 1.55;
+      padding-top: 12px;
+      border-top: 1px solid var(--bdr-s);
+    }
+
+    /* ── Anomaly table ──────────────────────────────── */
+    .atbl-head {
+      display: grid;
+      grid-template-columns: 1fr 14px 140px 70px;
+      gap: 14px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--bdr-s);
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .07em; text-transform: uppercase;
+      color: var(--tx3);
+    }
+    .atbl-row {
+      display: grid;
+      grid-template-columns: 1fr 14px 140px 70px;
+      gap: 14px; align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--bdr-s);
+    }
+    .atbl-row:last-child { border-bottom: none; }
+    .a-city { font-size: 14px; font-weight: 500; color: var(--tx); }
+    .a-meta { font-size: 11px; color: var(--tx2); margin-top: 1px; }
+    .a-dot { width: 7px; height: 7px; border-radius: 50%; justify-self: center; flex-shrink: 0; }
+    .a-dot.sev { background: var(--danger); }
+    .a-dot.mod { background: var(--warn); }
+    .a-bar-track { background: var(--surf2); border-radius: 3px; height: 4px; overflow: hidden; }
+    .a-bar-fill { height: 100%; border-radius: 3px; }
+    .a-bar-fill.sev { background: var(--danger); }
+    .a-bar-fill.mod { background: var(--warn); }
+    .a-score { font-family: var(--font-m); font-size: 12px; font-weight: 500; text-align: right; }
+    .a-score.sev { color: var(--danger); }
+    .a-score.mod { color: var(--warn); }
+
+    /* ── City select ────────────────────────────────── */
+    .city-sel {
+      width: 100%; max-width: 440px;
+      background: var(--surf); border: 1px solid var(--bdr);
+      border-radius: var(--r); color: var(--tx);
+      font-family: var(--font-b); font-size: 14px;
+      padding: 11px 36px 11px 14px;
+      appearance: none; cursor: pointer; outline: none;
+      background-image: var(--sel-arr);
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      transition: border-color .12s;
+    }
+    .city-sel:focus { border-color: var(--tx2); }
+
+    /* ── City hero ──────────────────────────────────── */
+    .city-name {
+      font-family: var(--font-d);
+      font-size: 44px; font-weight: 400;
+      letter-spacing: -.03em; line-height: 1;
+      margin-bottom: 12px;
+    }
+    .tag-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+    .tag {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: .05em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 3px;
+    }
+    .tag-hi  { background: rgba(232,64,64,.1); color: var(--danger); }
+    .tag-mod { background: rgba(232,160,32,.1); color: var(--warn); }
+    .tag-lo  { background: rgba(32,200,160,.1); color: var(--safe); }
+    .tag-anom{ background: rgba(232,64,64,.08); color: var(--danger); border: 1px solid rgba(232,64,64,.22); }
+    .tag-ok  { background: rgba(32,200,160,.08); color: var(--safe); border: 1px solid rgba(32,200,160,.22); }
+
+    /* ── Score display ──────────────────────────────── */
+    .score-big {
+      font-family: var(--font-m);
+      font-size: 58px; font-weight: 500;
+      letter-spacing: -.04em; line-height: 1;
+      margin: 4px 0;
+    }
+    .score-sub { font-size: 12px; color: var(--tx2); margin-top: 7px; }
+
+    /* ── Stats table ────────────────────────────────── */
+    .stbl-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--bdr-s);
+      font-size: 13px;
+    }
+    .stbl-row:last-child { border-bottom: none; }
+    .stbl-k { color: var(--tx2); }
+    .stbl-v { font-family: var(--font-m); font-size: 12px; color: var(--tx); font-weight: 500; }
+
+    /* ── AI block ───────────────────────────────────── */
+    .ai-block {
+      background: var(--surf2); border-radius: var(--r);
+      padding: 18px 22px; margin-top: 18px;
+    }
+    .ai-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--tx3); margin-bottom: 9px; }
+    .ai-text  { font-size: 13px; line-height: 1.85; color: var(--tx2); }
+
+    /* ── Compare page ───────────────────────────────── */
+    .cmp-selects {
+      display: grid;
+      grid-template-columns: 1fr 44px 1fr;
+      gap: 14px; align-items: end; margin-bottom: 18px;
+    }
+    .cmp-vs { text-align: center; font-size: 11px; font-weight: 700; color: var(--tx3); letter-spacing: .06em; padding-bottom: 12px; }
+    .cmp-label { font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--tx3); margin-bottom: 6px; }
+    .btn {
+      background: var(--tx); color: var(--bg);
+      border: none; padding: 10px 22px;
+      border-radius: var(--r);
+      font-family: var(--font-b); font-size: 13px; font-weight: 600;
+      cursor: pointer; letter-spacing: -.01em;
+      transition: opacity .12s;
+    }
+    .btn:hover { opacity: .82; }
+    .cmp-result { display: none; margin-top: 28px; }
+    .cmp-result.on { display: block; }
+    .verdict-banner {
+      text-align: center; padding: 36px;
+      background: var(--surf); border: 1px solid var(--bdr-s);
+      border-radius: var(--r-lg); margin-bottom: 18px;
+    }
+    .verdict-lbl { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3); margin-bottom: 7px; }
+    .verdict-city { font-family: var(--font-d); font-size: 40px; font-weight: 400; letter-spacing: -.025em; line-height: 1; margin-bottom: 7px; }
+    .verdict-delta { font-size: 13px; color: var(--tx2); }
+    .cmp-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+    .cmp-card { background: var(--surf); border: 1px solid var(--bdr-s); border-radius: var(--r-lg); padding: 22px; }
+    .cmp-card-name { font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--tx3); margin-bottom: 8px; }
+    .cmp-score { font-family: var(--font-m); font-size: 52px; font-weight: 500; letter-spacing: -.04em; line-height: 1; }
+    .cmp-score-sub { font-size: 12px; color: var(--tx2); margin-top: 6px; }
+
+    /* ── Ask AI page ────────────────────────────────── */
+    .ask-area { max-width: 680px; }
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+    .pill {
+      background: var(--surf); border: 1px solid var(--bdr);
+      border-radius: 99px; padding: 6px 14px;
+      font-size: 13px; color: var(--tx2);
+      cursor: pointer; font-family: var(--font-b);
+      transition: all .12s;
+    }
+    .pill:hover { border-color: var(--tx2); color: var(--tx); }
+    .ask-ta {
+      width: 100%; display: block;
+      background: var(--surf); border: 1px solid var(--bdr);
+      border-radius: var(--r); color: var(--tx);
+      font-family: var(--font-b); font-size: 14px;
+      padding: 13px 15px; resize: none; outline: none;
+      min-height: 80px; margin-bottom: 12px;
+      transition: border-color .12s;
+    }
+    .ask-ta:focus { border-color: var(--tx2); }
+    .ask-ta::placeholder { color: var(--tx3); }
+    .ask-resp { display: none; margin-top: 28px; }
+    .ask-resp.on { display: block; }
+    .resp-tag { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 3px; background: var(--surf2); color: var(--tx2); margin-bottom: 14px; }
+    .resp-text { font-size: 14px; line-height: 1.9; color: var(--tx); }
+    .resp-sources { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--bdr-s); }
+    .resp-src-lbl { font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--tx3); margin-bottom: 8px; }
+    .resp-src-item { font-size: 12px; color: var(--tx2); padding: 5px 0; border-bottom: 1px solid var(--bdr-s); }
+    .resp-src-item:last-child { border-bottom: none; }
+
+    /* ── Footer proto bar ───────────────────────────── */
+    .proto-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: 30px; background: var(--surf); border-top: 1px solid var(--bdr-s);
+      display: flex; align-items: center; padding: 0 var(--px);
+      font-size: 11px; color: var(--tx3); gap: 6px; z-index: 50;
+      transition: background .2s, border-color .2s;
+    }
+    .proto-bar strong { color: var(--tx2); font-weight: 600; }
+
+    /* ── Spacing util ───────────────────────────────── */
+    .mt16 { margin-top: 16px; }
+    .mt20 { margin-top: 20px; }
+    .mb18 { margin-bottom: 18px; }
+    .mb28 { margin-bottom: 28px; }
+  </style>
+<link id="gfont-Quicksand" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&amp;display=swap">
+<link id="gfont-Merriweather" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;500;600;700&amp;display=swap">
+<link id="gfont-Manrope" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Outfit:wght@400;500;600&display=swap" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+</head>
+<body style="font-family: Manrope">
+
+<!-- ── Navigation ─────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-logo">Safe<span class="dim">District</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-page="dashboard">Dashboard</button>
+    <button class="nav-tab" data-page="city">City Explorer</button>
+    <button class="nav-tab" data-page="compare">Compare</button>
+    <button class="nav-tab" data-page="ask">Ask AI</button>
+  </div>
+  <div class="nav-right">
+    <span class="badge-proto">Prototype</span>
+    <button class="theme-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle light/dark">
+      <svg id="ico-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg id="ico-moon" style="display:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</nav>
+
+<!-- ── Page: Dashboard ─────────────────────────────── -->
+<div class="page active" id="page-dashboard">
+  <div class="ph">
+    <h1 class="ph-title">India Crime Safety</h1>
+    <div class="ph-meta">
+      <span style="color: rgb(104, 134, 138)">53 cities monitored</span>
+      <div class="dot"></div>
+      <span>18 anomalies detected</span>
+      <div class="dot"></div>
+      <span>NCRB 2023</span>
+      <div class="dot"></div>
+      <span>IPC crimes data</span>
+    </div>
+  </div>
+
+  <div class="g2 mb18">
+    <div class="panel">
+      <div class="sl">Top 10 — Crimes per Lakh Population</div>
+      <div class="chart-box"><canvas id="chartDanger"></canvas></div>
+      <div class="chart-note">Higher rankings may reflect stronger FIR reporting culture rather than higher actual crime incidence. NCRB 2023.</div>
+    </div>
+    <div class="panel">
+      <div class="sl">Women Safety Risk — Crimes per Lakh</div>
+      <div class="chart-box"><canvas id="chartWomen"></canvas></div>
+      <div class="chart-note">Combined rate of rape + kidnapping cases per lakh population. NCRB 2023.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="sl">Statistical Anomalies — Unusual Crime Patterns</div>
+    <div class="atbl-head">
+      <div>City</div>
+      <div></div>
+      <div>Spike Intensity</div>
+      <div style="text-align:right">Score</div>
+    </div>
+    <div id="anomalyRows"></div>
+  </div>
+</div>
+
+<!-- ── Page: City Explorer ─────────────────────────── -->
+<div class="page" id="page-city">
+  <div class="ph">
+    <h1 class="ph-title">City Explorer</h1>
+    <div class="ph-meta"><span>Deep-dive into any city's crime profile</span></div>
+  </div>
+  <div class="mb28">
+    <div class="sl">Select city</div>
+    <select class="city-sel" id="citySelect">
+      <option value="Delhi">Delhi — Delhi</option>
+      <option value="Mumbai">Mumbai — Maharashtra</option>
+      <option value="Bangalore">Bengaluru — Karnataka</option>
+      <option value="Pune">Pune — Maharashtra</option>
+      <option value="Kochi">Kochi — Kerala</option>
+    </select>
+  </div>
+  <div id="cityProfile"></div>
+</div>
+
+<!-- ── Page: Compare ───────────────────────────────── -->
+<div class="page" id="page-compare">
+  <div class="ph">
+    <h1 class="ph-title">Compare Cities</h1>
+    <div class="ph-meta">
+      <span>Side-by-side safety analysis</span>
+      <div class="dot"></div>
+      <span>AI-powered verdict</span>
+    </div>
+  </div>
+  <div class="cmp-selects">
+    <div>
+      <div class="cmp-label">City 1</div>
+      <select class="city-sel" id="cmpCity1">
+        <option value="Delhi">Delhi</option>
+        <option value="Mumbai">Mumbai</option>
+        <option value="Bangalore">Bengaluru</option>
+        <option value="Pune">Pune</option>
+        <option value="Kochi">Kochi</option>
+      </select>
+    </div>
+    <div class="cmp-vs">vs</div>
+    <div>
+      <div class="cmp-label">City 2</div>
+      <select class="city-sel" id="cmpCity2">
+        <option value="Mumbai" selected>Mumbai</option>
+        <option value="Delhi">Delhi</option>
+        <option value="Bangalore">Bengaluru</option>
+        <option value="Pune">Pune</option>
+        <option value="Kochi">Kochi</option>
+      </select>
+    </div>
+  </div>
+  <button class="btn" id="cmpBtn">Compare →</button>
+  <div class="cmp-result" id="cmpResult"></div>
+</div>
+
+<!-- ── Page: Ask AI ────────────────────────────────── -->
+<div class="page" id="page-ask">
+  <div class="ph">
+    <h1 class="ph-title">Ask SafeDistrict AI</h1>
+    <div class="ph-meta">
+      <span>Natural language queries</span>
+      <div class="dot"></div>
+      <span>Grounded in NCRB 2023 data</span>
+    </div>
+  </div>
+  <div class="ask-area">
+    <div class="sl" style="margin-bottom:10px">Example questions</div>
+    <div class="pills">
+      <button class="pill">Is Delhi safe for women?</button>
+      <button class="pill">Which city in Maharashtra has the highest crime?</button>
+      <button class="pill">Compare Pune and Mumbai safety</button>
+      <button class="pill">Are there crime spikes anywhere in 2023?</button>
+    </div>
+    <div class="sl" style="margin-bottom:8px">Your question</div>
+    <textarea class="ask-ta" id="askTa" placeholder="Ask about crime safety in any Indian city…" rows="3"></textarea>
+    <button class="btn" id="askBtn">Ask SafeDistrict AI →</button>
+    <div class="ask-resp" id="askResp">
+      <div class="resp-tag" id="respTag"></div>
+      <div class="resp-text" id="respText"></div>
+      <div class="resp-sources" id="respSources"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Prototype bar ────────────────────────────────── -->
+<div class="proto-bar">
+  <strong>Design prototype</strong>
+  <span>— mock data, not connected to backend · SafeDistrict AI · NCRB 2023</span>
+</div>
+
+<script>
+/* ── Mock data ─────────────────────────────────────── */
+const TOP10 = [
+  {city:"Kochi",val:1842},{city:"T'puram",val:1756},{city:"Delhi",val:1698},
+  {city:"Kozhikode",val:1523},{city:"Patna",val:1445},{city:"Lucknow",val:1389},
+  {city:"Mumbai",val:1298},{city:"Kolkata",val:1187},{city:"Indore",val:1143},
+  {city:"Jaipur",val:1098}
+];
+const WOMEN8 = [
+  {city:"Delhi",val:184},{city:"Patna",val:163},{city:"Mumbai",val:142},
+  {city:"Jaipur",val:129},{city:"Lucknow",val:119},{city:"Kolkata",val:109},
+  {city:"Pune",val:97},{city:"Ahmedabad",val:89}
+];
+const ANOMALIES = [
+  {city:"Delhi City",state:"Delhi",type:"Overall Crime",score:1.000,sev:true},
+  {city:"Kochi",state:"Kerala",type:"Overall Crime",score:0.934,sev:true},
+  {city:"Thiruvananthapuram",state:"Kerala",type:"Vehicle Theft",score:0.812,sev:false},
+  {city:"Patna",state:"Bihar",type:"Kidnapping",score:0.743,sev:false},
+  {city:"Lucknow",state:"Uttar Pradesh",type:"Overall Crime",score:0.671,sev:false}
+];
+const CITIES = {
+  Delhi:{name:"Delhi",state:"Delhi",score:3.2,risk:"High",totalIPC:191988,cpl:1698.4,pop:11034555,womenRisk:10227,anomaly:true,murder:562,rape:1915,kidnapping:8312,robbery:2347,burglary:9456,vehicleTheft:28943,ai:"Delhi records among the highest crime rates in the dataset at 1,698 IPC cases per lakh — a severe statistical outlier (anomaly score 1.000). Women-specific crime rates are the highest nationally, driven by kidnapping (8,312) and rape (1,915) cases. These figures should be contextualised: Delhi has a large floating population and strong institutional FIR registration practices. Source: NCRB 2023."},
+  Mumbai:{name:"Mumbai",state:"Maharashtra",score:5.1,risk:"Moderate",totalIPC:155209,cpl:1298.6,pop:11960000,womenRisk:6287,anomaly:false,murder:397,rape:1243,kidnapping:5044,robbery:3122,burglary:8934,vehicleTheft:31204,ai:"Mumbai sits at a moderate risk level with 1,299 IPC crimes per lakh. Property crimes dominate — vehicle theft leads with 31,204 cases. Violent crime rates are significantly lower than Delhi. Not flagged as a statistical anomaly. Source: NCRB 2023."},
+  Bangalore:{name:"Bengaluru",state:"Karnataka",score:6.8,risk:"Low",totalIPC:48742,cpl:578.2,pop:8436675,womenRisk:2134,anomaly:false,murder:178,rape:543,kidnapping:1591,robbery:876,burglary:4312,vehicleTheft:18234,ai:"Bengaluru records a relatively lower crime rate at 578 IPC cases per lakh — well below the metro average. The city's profile is dominated by property crimes rather than violent crime. Not flagged as a statistical anomaly. Source: NCRB 2023."},
+  Pune:{name:"Pune",state:"Maharashtra",score:7.2,risk:"Low",totalIPC:32118,cpl:1031.2,pop:3115431,womenRisk:1876,anomaly:false,murder:124,rape:398,kidnapping:1478,robbery:543,burglary:3234,vehicleTheft:12456,ai:"Pune records 1,031 IPC crimes per lakh — moderate range for a city of its size. Women-specific crime rates are lower than comparable metros. Not flagged as a statistical anomaly in the 2023 NCRB data. Source: NCRB 2023."},
+  Kochi:{name:"Kochi",state:"Kerala",score:2.8,risk:"High",totalIPC:23456,cpl:1842.3,pop:601574,womenRisk:1234,anomaly:true,murder:43,rape:267,kidnapping:967,robbery:234,burglary:1876,vehicleTheft:8934,ai:"Kochi records the highest crimes-per-lakh ratio in the dataset at 1,842 — a severe statistical outlier. This is consistent with Kerala's well-documented FIR registration culture, which produces higher reported rates independent of actual incidence. Published NCRB analysis consistently confirms this pattern. Source: NCRB 2023."}
+};
+
+/* ── Theme ─────────────────────────────────────────── */
+let dark = true;
+const HTML = document.documentElement;
+
+document.getElementById("themeBtn").addEventListener("click", () => {
+  dark = !dark;
+  HTML.setAttribute("data-theme", dark ? "dark" : "light");
+  document.getElementById("ico-sun").style.display  = dark ? "block" : "none";
+  document.getElementById("ico-moon").style.display = dark ? "none"  : "block";
+  rebuildDashCharts();
+  if (document.getElementById("page-city").classList.contains("active") && cityInited.done) {
+    renderCity(document.getElementById("citySelect").value);
+  }
+  // Re-apply tweaks after theme switch (bg/contrast only apply in dark mode)
+  if (window.__applyTweaks && window.__currentTweaks) {
+    setTimeout(() => window.__applyTweaks(window.__currentTweaks), 20);
+  }
+});
+
+/* ── Navigation ────────────────────────────────────── */
+const cityInited   = { done: false };
+const compareInited = { done: false };
+
+document.querySelectorAll(".nav-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("page-" + tab.dataset.page).classList.add("active");
+
+    // Render city chart after page is visible so Chart.js can measure correctly
+    if (tab.dataset.page === "city" && !cityInited.done) {
+      cityInited.done = true;
+      renderCity(document.getElementById("citySelect").value);
+    }
+  });
+});
+
+/* ── Chart helpers ─────────────────────────────────── */
+function cv(v) { return getComputedStyle(HTML).getPropertyValue(v).trim(); }
+
+function tooltip() {
+  return {
+    backgroundColor: dark ? "#1a1a22" : "#ffffff",
+    borderColor:     dark ? "#252530" : "#d6d6e6",
+    borderWidth: 1,
+    titleColor: cv("--tx"),
+    bodyColor:  cv("--tx2"),
+    padding: 10, cornerRadius: 4
+  };
+}
+
+function hBarOpts(extraTooltip) {
+  const t2 = cv("--tx2");
+  return {
+    indexAxis: "y",
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { ...tooltip(), ...extraTooltip } },
+    scales: {
+      x: {
+        grid: { color: dark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.06)" },
+        ticks: { color: t2, font: { family: "'JetBrains Mono'", size: 11 } },
+        border: { display: false }
+      },
+      y: {
+        grid: { display: false },
+        ticks: { color: t2, font: { family: "'Manrope'", size: 12 }, padding: 5 },
+        border: { display: false }
+      }
+    }
+  };
+}
+
+function vBarOpts() {
+  const t2 = cv("--tx2");
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { ...tooltip() } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: t2, font: { family: "'Manrope'", size: 11 } }, border: { display: false } },
+      y: { grid: { color: dark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.06)" }, ticks: { color: t2, font: { family: "'JetBrains Mono'", size: 10 } }, border: { display: false } }
+    }
+  };
+}
+
+/* ── Dashboard charts ──────────────────────────────── */
+let cDanger, cWomen;
+
+function buildDashCharts() {
+  const barBg   = dark ? "rgba(232,232,240,.14)" : "rgba(13,13,16,.11)";
+  const barHov  = dark ? "rgba(232,232,240,.26)" : "rgba(13,13,16,.2)";
+  const wBg     = dark ? "rgba(232,64,64,.22)"   : "rgba(200,32,32,.14)";
+  const wHov    = dark ? "rgba(232,64,64,.38)"   : "rgba(200,32,32,.26)";
+
+  const d10 = [...TOP10].reverse();
+  const w8  = [...WOMEN8].reverse();
+
+  cDanger = new Chart(document.getElementById("chartDanger"), {
+    type: "bar",
+    data: {
+      labels: d10.map(d => d.city),
+      datasets: [{ data: d10.map(d => d.val), backgroundColor: barBg, hoverBackgroundColor: barHov, borderRadius: 3, borderSkipped: false }]
+    },
+    options: hBarOpts({ callbacks: { label: ctx => `  ${ctx.parsed.x.toLocaleString()} per lakh` } })
+  });
+
+  cWomen = new Chart(document.getElementById("chartWomen"), {
+    type: "bar",
+    data: {
+      labels: w8.map(d => d.city),
+      datasets: [{ data: w8.map(d => d.val), backgroundColor: wBg, hoverBackgroundColor: wHov, borderRadius: 3, borderSkipped: false }]
+    },
+    options: hBarOpts({ callbacks: { label: ctx => `  ${ctx.parsed.x.toLocaleString()} per lakh` } })
+  });
+}
+
+function rebuildDashCharts() {
+  if (cDanger) { cDanger.destroy(); cWomen.destroy(); }
+  buildDashCharts();
+}
+
+/* ── Anomaly rows ──────────────────────────────────── */
+function renderAnomalies() {
+  document.getElementById("anomalyRows").innerHTML = ANOMALIES.map(a => {
+    const c = a.sev ? "sev" : "mod";
+    return `
+      <div class="atbl-row">
+        <div><div class="a-city">${a.city}</div><div class="a-meta">${a.state} · ${a.type}</div></div>
+        <div class="a-dot ${c}"></div>
+        <div class="a-bar-track"><div class="a-bar-fill ${c}" style="width:${Math.round(a.score*100)}%"></div></div>
+        <div class="a-score ${c}">${a.score.toFixed(3)}</div>
+      </div>`;
+  }).join("");
+}
+
+/* ── City Explorer ─────────────────────────────────── */
+let cityChart = null;
+
+function scoreColor(s) { return s <= 4 ? "var(--danger)" : s <= 6 ? "var(--warn)" : "var(--safe)"; }
+function riskTag(r) { return r.includes("High") ? "tag-hi" : r.includes("Low") ? "tag-lo" : "tag-mod"; }
+
+function renderCity(key) {
+  const d = CITIES[key];
+  const sc = scoreColor(d.score);
+  const dc = d.score >= 5 ? "var(--safe)" : "var(--danger)";
+  const ds = (d.score >= 5 ? "+" : "") + (d.score - 5).toFixed(1);
+
+  const stats = [
+    ["Total IPC Cases", d.totalIPC.toLocaleString()],
+    ["Crimes per Lakh", d.cpl.toFixed(1)],
+    ["Population", d.pop.toLocaleString()],
+    ["Women Risk Cases", d.womenRisk.toLocaleString()],
+    ["Risk Level", d.risk],
+    ["Statistical Anomaly", d.anomaly ? "Yes" : "No"]
+  ];
+
+  document.getElementById("cityProfile").innerHTML = `
+    <div class="city-name">${d.name}</div>
+    <div class="tag-row">
+      <span style="font-size:13px;color:var(--tx2)">${d.state}</span>
+      <span class="tag ${riskTag(d.risk)}">${d.risk} Risk</span>
+      <span class="tag ${d.anomaly ? "tag-anom" : "tag-ok"}">${d.anomaly ? "Anomaly detected" : "No anomaly"}</span>
+    </div>
+    <div class="g2 mb18">
+      <div class="panel">
+        <div class="sl">Safety Score</div>
+        <div class="score-big" style="color:${sc}">${d.score.toFixed(1)}</div>
+        <div class="score-sub">out of 10 · higher is safer</div>
+      </div>
+      <div class="panel">
+        <div class="sl">vs. National Average</div>
+        <div class="score-big" style="color:${dc}">${ds}</div>
+        <div class="score-sub">relative to 5.0 average score</div>
+      </div>
+    </div>
+    <div class="g2 mb18">
+      <div class="panel">
+        <div class="sl">Crime Breakdown — 2023</div>
+        <div style="position:relative;height:240px"><canvas id="cityChartC"></canvas></div>
+        <div class="chart-note">Reported IPC cases by category · NCRB 2023</div>
+      </div>
+      <div class="panel">
+        <div class="sl">City Statistics</div>
+        ${stats.map(([k,v])=>`<div class="stbl-row"><span class="stbl-k">${k}</span><span class="stbl-v">${v}</span></div>`).join("")}
+      </div>
+    </div>
+    <div class="ai-block">
+      <div class="ai-label">AI Safety Assessment</div>
+      <div class="ai-text">${d.ai}</div>
+    </div>
+  `;
+
+  if (cityChart) cityChart.destroy();
+  const ck = ["murder","rape","kidnapping","robbery","burglary","vehicleTheft"];
+  const cl = ["Murder","Rape","Kidnapping","Robbery","Burglary","Veh. Theft"];
+  const cc = ["rgba(232,64,64,.7)","rgba(232,100,40,.7)","rgba(232,160,32,.7)","rgba(140,140,80,.7)","rgba(80,110,200,.7)","rgba(140,80,200,.7)"];
+  cityChart = new Chart(document.getElementById("cityChartC"), {
+    type: "bar",
+    data: { labels: cl, datasets: [{ data: ck.map(k => d[k]), backgroundColor: cc, borderRadius: 3, borderSkipped: false }] },
+    options: vBarOpts()
+  });
+}
+
+document.getElementById("citySelect").addEventListener("change", e => renderCity(e.target.value));
+
+/* ── Compare ───────────────────────────────────────── */
+let cmpChart = null;
+
+document.getElementById("cmpBtn").addEventListener("click", () => {
+  const k1 = document.getElementById("cmpCity1").value;
+  const k2 = document.getElementById("cmpCity2").value;
+  if (k1 === k2) { alert("Please select two different cities."); return; }
+
+  const c1 = CITIES[k1], c2 = CITIES[k2];
+  const safer = c1.score > c2.score ? c1 : c2;
+  const other = c1.score > c2.score ? c2 : c1;
+  const diff = Math.abs(c1.score - c2.score).toFixed(1);
+  const s1c = scoreColor(c1.score), s2c = scoreColor(c2.score);
+
+  const ck = ["murder","rape","kidnapping","robbery","burglary","vehicleTheft"];
+  const cl = ["Murder","Rape","Kidnapping","Robbery","Burglary","Veh. Theft"];
+  const t2 = cv("--tx2");
+
+  document.getElementById("cmpResult").innerHTML = `
+    <div class="verdict-banner">
+      <div class="verdict-lbl">Safer Choice</div>
+      <div class="verdict-city">${safer.name}</div>
+      <div class="verdict-delta">${diff} points safer than ${other.name}</div>
+    </div>
+    <div class="cmp-cards">
+      <div class="cmp-card">
+        <div class="cmp-card-name">${c1.name} · ${c1.state}</div>
+        <div class="cmp-score" style="color:${s1c}">${c1.score.toFixed(1)}</div>
+        <div class="cmp-score-sub">Safety Score / 10</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-card-name">${c2.name} · ${c2.state}</div>
+        <div class="cmp-score" style="color:${s2c}">${c2.score.toFixed(1)}</div>
+        <div class="cmp-score-sub">Safety Score / 10</div>
+      </div>
+    </div>
+    <div class="panel mb18">
+      <div class="sl">Crime Comparison by Category</div>
+      <div style="position:relative;height:260px"><canvas id="cmpChartC"></canvas></div>
+    </div>
+    <div class="ai-block">
+      <div class="ai-label">AI Comparative Analysis</div>
+      <div class="ai-text">${safer.name} is statistically safer than ${other.name} with a safety score of ${safer.score.toFixed(1)} versus ${other.score.toFixed(1)}. ${safer.name} records ${safer.cpl.toFixed(0)} IPC crimes per lakh compared to ${other.cpl.toFixed(0)} for ${other.name}.${safer.anomaly ? " Note: " + safer.name + " is flagged as a statistical anomaly — interpret with caution." : ""} Source: NCRB 2023.</div>
+    </div>
+  `;
+  document.getElementById("cmpResult").classList.add("on");
+
+  if (cmpChart) cmpChart.destroy();
+  cmpChart = new Chart(document.getElementById("cmpChartC"), {
+    type: "bar",
+    data: {
+      labels: cl,
+      datasets: [
+        { label: c1.name, data: ck.map(k => c1[k]), backgroundColor: dark ? "rgba(100,120,220,.6)" : "rgba(60,80,180,.5)", borderRadius: 3, borderSkipped: false },
+        { label: c2.name, data: ck.map(k => c2[k]), backgroundColor: dark ? "rgba(210,140,60,.6)"  : "rgba(160,90,20,.5)",  borderRadius: 3, borderSkipped: false }
+      ]
+    },
+    options: {
+      ...vBarOpts(),
+      plugins: {
+        legend: { display: true, labels: { color: t2, font: { family: "'Manrope'", size: 12 }, boxWidth: 12, padding: 16 } },
+        tooltip: { ...tooltip() }
+      }
+    }
+  });
+});
+
+/* ── Ask AI ────────────────────────────────────────── */
+document.querySelectorAll(".pill").forEach(p => {
+  p.addEventListener("click", () => { document.getElementById("askTa").value = p.textContent; });
+});
+
+document.getElementById("askBtn").addEventListener("click", () => {
+  const q = document.getElementById("askTa").value.trim();
+  if (!q) return;
+  document.getElementById("respTag").textContent = "Contextual Query";
+  document.getElementById("respText").textContent =
+    "Based on NCRB 2023 data across 53 metropolitan cities, Delhi records the highest women-specific crime rate with 10,227 combined rape and kidnapping cases — 184 per lakh population. This is significantly above the dataset average of 61 per lakh. Delhi is flagged as a severe statistical anomaly (score: 1.000). However, this should be contextualised: Delhi has strong institutional FIR registration practices. Kerala cities (Kochi, Thiruvananthapuram) rank high overall due to reporting culture, not necessarily higher actual incidence.";
+  document.getElementById("respSources").innerHTML = `
+    <div class="resp-src-lbl">Sources used</div>
+    <div class="resp-src-item">NCRB Crime in India 2023 — Delhi City profile</div>
+    <div class="resp-src-item">NCRB Crime in India 2023 — Comparative tables, women's safety</div>
+  `;
+  document.getElementById("askResp").classList.add("on");
+});
+
+/* ── Init ──────────────────────────────────────────── */
+buildDashCharts();
+renderAnomalies();
+</script>
+
+<div id="tweaks-root"></div>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "contrast": "Crisp",
+  "bgTone": "Neutral",
+  "font": "Manrope",
+  "typeSize": 16
+}/*EDITMODE-END*/;
+
+const BG_PRESETS = {
+  Neutral:  ["#0d0d10","#131318","#1a1a22","#252530","#1c1c26"],
+  Navy:     ["#0a0d18","#0f1424","#161e32","#1e2a40","#141e32"],
+  Charcoal: ["#111111","#181818","#202020","#2c2c2c","#202020"],
+};
+const CT_PRESETS = {
+  Dim:     ["#606080","#303048"],
+  Default: ["#8888aa","#505068"],
+  Crisp:   ["#aaaac8","#707090"],
+};
+
+function applyAllTweaks(t) {
+  const root = document.documentElement;
+  if (root.getAttribute("data-theme") === "dark") {
+    const [bg,surf,surf2,bdr,bdrs] = BG_PRESETS[t.bgTone] || BG_PRESETS.Neutral;
+    const [tx2,tx3] = CT_PRESETS[t.contrast] || CT_PRESETS.Default;
+    root.style.setProperty("--bg",    bg);
+    root.style.setProperty("--surf",  surf);
+    root.style.setProperty("--surf2", surf2);
+    root.style.setProperty("--bdr",   bdr);
+    root.style.setProperty("--bdr-s", bdrs);
+    root.style.setProperty("--tx2",   tx2);
+    root.style.setProperty("--tx3",   tx3);
+  } else {
+    ["--bg","--surf","--surf2","--bdr","--bdr-s","--tx2","--tx3"]
+      .forEach(p => root.style.removeProperty(p));
+  }
+  const ff = `'${t.font}', sans-serif`;
+  root.style.setProperty("--font-b", ff);
+  document.body.style.fontFamily = ff;
+  document.body.style.fontSize   = t.typeSize + "px";
+}
+
+window.__applyTweaks = applyAllTweaks;
+
+function TweaksApp() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  React.useEffect(() => {
+    applyAllTweaks(t);
+    window.__currentTweaks = t;
+  }, [t]);
+
+  return (
+    <TweaksPanel title="Tweaks">
+      <TweakSection label="Readability" />
+      <TweakRadio  label="Text contrast" value={t.contrast}
+                   options={["Dim","Default","Crisp"]}
+                   onChange={v => setTweak("contrast", v)} />
+      <TweakSlider label="Type size" value={t.typeSize}
+                   min={12} max={17} step={1} unit="px"
+                   onChange={v => setTweak("typeSize", v)} />
+      <TweakSection label="Appearance" />
+      <TweakRadio  label="Background" value={t.bgTone}
+                   options={["Neutral","Navy","Charcoal"]}
+                   onChange={v => setTweak("bgTone", v)} />
+      <TweakSelect label="Body font" value={t.font}
+                   options={["Manrope","Space Grotesk","Outfit"]}
+                   onChange={v => setTweak("font", v)} />
+    </TweaksPanel>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("tweaks-root")).render(<TweaksApp />);
+</script>
+</body>
+</html>
