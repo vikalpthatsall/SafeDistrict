@@ -7,7 +7,6 @@ comparison using a LangGraph ReAct agent with tool calling.
 
 from __future__ import annotations
 
-import os
 import sys
 
 sys.path.insert(0, ".")
@@ -20,10 +19,10 @@ from langchain_core.messages import SystemMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
-from backend.data_loader import CrimeDataLoader
 from backend.anomaly_engine import AnomalyEngine
+from backend.config import get_settings
+from backend.data_loader import CrimeDataLoader
 from backend.rag_pipeline import RAGPipeline
-
 
 _SYSTEM_PROMPT = (
     "You are SafeDistrict AI, a crime safety assistant for Indian cities. "
@@ -70,11 +69,12 @@ class SafeDistrictAgent:
     # ------------------------------------------------------------------
 
     def _build_llm(self):
-        if os.getenv("ANTHROPIC_API_KEY"):
+        settings = get_settings()
+        if settings.anthropic_api_key:
             from langchain_anthropic import ChatAnthropic
-            return ChatAnthropic(model="claude-sonnet-4-6")
+            return ChatAnthropic(model=settings.anthropic_model)
         from langchain_groq import ChatGroq
-        return ChatGroq(model="llama-3.3-70b-versatile")
+        return ChatGroq(model=settings.groq_model)
 
     # ------------------------------------------------------------------
     # Tool factory
@@ -145,7 +145,7 @@ class SafeDistrictAgent:
             answer = result["answer"]
             sources = result["sources"]
             num_sources = result["num_sources"]
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
             answer = f"AI analysis unavailable ({exc}). Please retry later."
             sources = []
             num_sources = 0
@@ -181,7 +181,7 @@ class SafeDistrictAgent:
             rag_result = self.rag.query(question)
             extra = f"\n\nAdditional context:\n{rag_result['answer']}"
             sources = rag_result["sources"]
-        except Exception:
+        except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
             extra = ""
             sources = []
 
@@ -230,7 +230,7 @@ class SafeDistrictAgent:
             rag_result = self.rag.compare_query(found[0], found[1])
             extra = f"\n\nDetailed analysis:\n{rag_result['answer']}"
             sources = rag_result["sources"]
-        except Exception:
+        except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
             extra = ""
             sources = []
 
@@ -266,7 +266,7 @@ class SafeDistrictAgent:
         try:
             rag_result = self.rag.query(f"Tell me about crime safety in {city}")
             rag_summary = rag_result["answer"]
-        except Exception:
+        except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
             rag_summary = ""
 
         return {

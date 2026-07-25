@@ -9,22 +9,20 @@ Tiered quality for crime counts:
 """
 
 import sys
-import numpy as np
+
 import pandas as pd
 
 sys.path.insert(0, ".")
 from data.processed.ncrb_2023_verified import (
     NCRB_2023_CRIME_RATE_PER_LAKH,
+    NCRB_2023_KEY_FINDINGS,
+    NCRB_2023_KIDNAPPING,
     NCRB_2023_MURDER_RATE_PER_LAKH,
     NCRB_2023_MURDERS,
-    NCRB_2023_RAPE,
-    NCRB_2023_KIDNAPPING,
-    NCRB_2023_STATE_RATIOS,
     NCRB_2023_NATIONAL_RATIOS,
-    NCRB_2023_KEY_FINDINGS,
-    DATA_SOURCES,
+    NCRB_2023_RAPE,
+    NCRB_2023_STATE_RATIOS,
 )
-
 
 _CITY_STATE = {
     "Agra": "Uttar Pradesh",
@@ -210,7 +208,7 @@ def load_real_ncrb_data() -> pd.DataFrame:
             df[col] = df[col].astype(int)
         df["_source"] = "excel"
         return df.reset_index(drop=True)
-    except Exception:
+    except Exception:  # noqa: BLE001 — missing/malformed data/raw/ Excel (or missing openpyxl) all fall back to the 19-city dict the same way.
         rows = [
             {
                 "city": city,

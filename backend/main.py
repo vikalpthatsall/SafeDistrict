@@ -7,7 +7,6 @@ Exposes REST endpoints consumed by the Streamlit frontend.
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from contextlib import asynccontextmanager
 
@@ -27,6 +26,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from backend.agent import SafeDistrictAgent
+from backend.config import get_settings
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -74,7 +74,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # CORS — read from env; default to localhost Streamlit for local dev
 # ---------------------------------------------------------------------------
 
-_origins_raw = os.getenv("ALLOWED_ORIGINS", "")
+_origins_raw = get_settings().allowed_origins
 allowed_origins = (
     [o.strip() for o in _origins_raw.split(",") if o.strip()]
     if _origins_raw
@@ -208,7 +208,7 @@ def state_cities(request: Request, state_name: str) -> list[dict]:
         try:
             profile = agent.anomaly_engine.get_city_safety_score(df, city)
             results.append(profile)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 — one city's safety-score failure shouldn't 500 the whole list; skip it. Real fix (log + partial-failure reporting) is roadmap Tier 2.
             pass
     return results
 

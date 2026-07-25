@@ -6,26 +6,27 @@ HuggingFace embeddings, then answers natural-language safety
 queries via ChatGroq (llama-3.3-70b-versatile).
 
 Every document carries an inline citation tag:
-  [NCRB 2023 verified]                   — exact counts from NCRB tables
-  [derived from NCRB 2023 murder rates]  — computed from rate × population
-  [estimated from NCRB 2023 state ratios] — state-level ratio × total IPC
+  [NCRB 2023 verified]                              — exact counts from NCRB tables
+  [derived from NCRB 2023 murder rates]              — computed from rate × population
+  [estimated from NCRB 2023 state ratios]            — state-level ratio × total IPC
+  [estimated from NCRB 2023 national ratios — lowest confidence] — national ratio × total IPC (fallback)
 
 Every query response includes data_citation and source_url fields.
 """
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
 
+from backend.config import get_settings
 
 _DATA_CITATION = "NCRB Crime in India 2023"
 _SOURCE_URL = "https://data.opencity.in/dataset/crime-in-india-2023"
@@ -55,6 +56,8 @@ def build_crime_documents(df: pd.DataFrame) -> list[str]:
             citation = "[NCRB 2023 verified]"
         elif quality == "derived":
             citation = "[derived from NCRB 2023 murder rates]"
+        elif quality == "national":
+            citation = "[estimated from NCRB 2023 national ratios — lowest confidence]"
         else:
             citation = "[estimated from NCRB 2023 state ratios]"
 
@@ -196,13 +199,7 @@ class RAGPipeline:
         key_findings : list[str] | None
             Optional NCRB key findings to embed as an additional context document.
         """
-        groq_key = os.getenv("GROQ_API_KEY")
-        if not groq_key:
-            raise EnvironmentError(
-                "GROQ_API_KEY not found. Add it to your .env file:\n"
-                "  GROQ_API_KEY=gsk_..."
-            )
-
+        settings = get_settings()
         store_exists = Path(persist_dir).exists() and any(Path(persist_dir).iterdir())
 
         if rebuild or not store_exists:
@@ -218,8 +215,8 @@ class RAGPipeline:
 
         self.retriever = store.as_retriever(search_kwargs={"k": 5})
         self.llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
-            api_key=groq_key,
+            model=settings.groq_model,
+            api_key=settings.groq_api_key,
             max_tokens=1024,
         )
 
