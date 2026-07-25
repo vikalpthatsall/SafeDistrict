@@ -1,8 +1,11 @@
 import asyncio
 from unittest.mock import AsyncMock, Mock
 
+import httpx
 import pandas as pd
 import pytest
+import tenacity
+from groq import APIConnectionError
 from langchain_core.documents import Document
 
 from backend.config import Settings
@@ -11,6 +14,22 @@ from backend.rag_pipeline import (
     build_crime_documents,
     build_key_findings_document,
 )
+
+
+def _transient_groq_error() -> APIConnectionError:
+    """A minimal, real groq SDK exception — same type RAGPipeline retries on."""
+    return APIConnectionError(request=httpx.Request("POST", "https://api.groq.com"))
+
+
+@pytest.fixture
+def no_retry_wait(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip real exponential backoff (1s/2s) in tests that exhaust retries.
+
+    tenacity exposes the AsyncRetrying instance as `<method>.retry`, with a
+    mutable `.wait` — the officially documented way to override retry timing
+    per-test without touching the decorator itself.
+    """
+    monkeypatch.setattr(RAGPipeline._invoke_groq.retry, "wait", tenacity.wait_none())
 
 _ROW_COLUMNS = [
     "city", "state", "murder", "rape", "kidnapping", "robbery",
@@ -79,21 +98,25 @@ def test_settings_raises_without_groq_key(monkeypatch: pytest.MonkeyPatch) -> No
         Settings(_env_file=None)
 
 
+def _pipeline_with_mocks(fake_docs: list[Document]) -> RAGPipeline:
+    pipeline = RAGPipeline.__new__(RAGPipeline)
+    pipeline.retriever = Mock()
+    pipeline.retriever.ainvoke = AsyncMock(return_value=fake_docs)
+    pipeline.llm = Mock()
+    pipeline.fallback_llm = None
+    return pipeline
+
+
 def test_rag_pipeline_query_shape() -> None:
     # No pytest-asyncio in requirements.txt, so this stays a plain sync test
     # function and drives the coroutine itself via asyncio.run(), rather than
     # adding a new test-only dependency for one test.
-    pipeline = RAGPipeline.__new__(RAGPipeline)
-
     fake_docs = [
         Document(page_content="doc one content"),
         Document(page_content="doc two content"),
         Document(page_content="doc three content"),
     ]
-    pipeline.retriever = Mock()
-    pipeline.retriever.ainvoke = AsyncMock(return_value=fake_docs)
-
-    pipeline.llm = Mock()
+    pipeline = _pipeline_with_mocks(fake_docs)
     pipeline.llm.ainvoke = AsyncMock(return_value=Mock(content="a fake generated answer"))
 
     result = asyncio.run(pipeline.aquery("Is Testville safe?"))
@@ -104,3 +127,31 @@ def test_rag_pipeline_query_shape() -> None:
     assert len(result["sources"]) == len(fake_docs)
     assert "data_citation" in result
     assert "source_url" in result
+    # successful first attempt — retry must not fire extra calls
+    assert pipeline.llm.ainvoke.call_count == 1
+
+
+def test_aquery_retries_groq_four_times_then_raises(no_retry_wait: None) -> None:
+    fake_docs = [Document(page_content="doc content")]
+    pipeline = _pipeline_with_mocks(fake_docs)
+    pipeline.llm.ainvoke = AsyncMock(side_effect=_transient_groq_error())
+    # no fallback configured — retry-then-raise is the whole story here
+
+    with pytest.raises(APIConnectionError):
+        asyncio.run(pipeline.aquery("Is Testville safe?"))
+
+    assert pipeline.llm.ainvoke.call_count == 4
+
+
+def test_aquery_falls_back_to_anthropic_after_groq_exhausted(no_retry_wait: None) -> None:
+    fake_docs = [Document(page_content="doc content")]
+    pipeline = _pipeline_with_mocks(fake_docs)
+    pipeline.llm.ainvoke = AsyncMock(side_effect=_transient_groq_error())
+    pipeline.fallback_llm = Mock()
+    pipeline.fallback_llm.ainvoke = AsyncMock(return_value=Mock(content="fallback answer"))
+
+    result = asyncio.run(pipeline.aquery("Is Testville safe?"))
+
+    assert result["answer"] == "fallback answer"
+    assert pipeline.llm.ainvoke.call_count == 4
+    pipeline.fallback_llm.ainvoke.assert_called_once()

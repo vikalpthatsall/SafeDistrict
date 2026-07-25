@@ -73,9 +73,9 @@ class SafeDistrictAgent:
         settings = get_settings()
         if settings.anthropic_api_key:
             from langchain_anthropic import ChatAnthropic
-            return ChatAnthropic(model=settings.anthropic_model)
+            return ChatAnthropic(model=settings.anthropic_model, temperature=0)
         from langchain_groq import ChatGroq
-        return ChatGroq(model=settings.groq_model)
+        return ChatGroq(model=settings.groq_model, temperature=0)
 
     # ------------------------------------------------------------------
     # Tool factory
@@ -146,7 +146,7 @@ class SafeDistrictAgent:
             answer = result["answer"]
             sources = result["sources"]
             num_sources = result["num_sources"]
-        except Exception as exc:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
+        except Exception as exc:  # noqa: BLE001 — last-resort catch: rag_pipeline.aquery() already retries transient Groq errors (4x, 1s/2s/4s backoff) and falls back to Anthropic if configured; this only fires once both have failed, or on a non-transient error from either provider.
             answer = f"AI analysis unavailable ({exc}). Please retry later."
             sources = []
             num_sources = 0
@@ -182,7 +182,7 @@ class SafeDistrictAgent:
             rag_result = await self.rag.aquery(question)
             extra = f"\n\nAdditional context:\n{rag_result['answer']}"
             sources = rag_result["sources"]
-        except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
+        except Exception:  # noqa: BLE001 — last-resort catch: rag_pipeline.aquery() already retries transient Groq errors (4x, 1s/2s/4s backoff) and falls back to Anthropic if configured; this only fires once both have failed, or on a non-transient error from either provider.
             extra = ""
             sources = []
 
@@ -231,7 +231,7 @@ class SafeDistrictAgent:
             rag_result = await self.rag.acompare_query(found[0], found[1])
             extra = f"\n\nDetailed analysis:\n{rag_result['answer']}"
             sources = rag_result["sources"]
-        except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
+        except Exception:  # noqa: BLE001 — last-resort catch: rag_pipeline.aquery() already retries transient Groq errors (4x, 1s/2s/4s backoff) and falls back to Anthropic if configured; this only fires once both have failed, or on a non-transient error from either provider.
             extra = ""
             sources = []
 
@@ -267,7 +267,7 @@ class SafeDistrictAgent:
         try:
             rag_result = await self.rag.aquery(f"Tell me about crime safety in {city}")
             rag_summary = rag_result["answer"]
-        except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
+        except Exception:  # noqa: BLE001 — last-resort catch: rag_pipeline.aquery() already retries transient Groq errors (4x, 1s/2s/4s backoff) and falls back to Anthropic if configured; this only fires once both have failed, or on a non-transient error from either provider.
             rag_summary = ""
 
         return {

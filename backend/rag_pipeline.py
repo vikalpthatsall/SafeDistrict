@@ -22,15 +22,26 @@ from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
+from groq import APIConnectionError, APITimeoutError, RateLimitError
 from langchain_chroma import Chroma
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from backend.config import get_settings
 
 _DATA_CITATION = "NCRB Crime in India 2023"
 _SOURCE_URL = "https://data.opencity.in/dataset/crime-in-india-2023"
+
+# Transient-looking Groq failures worth retrying — not auth/validation errors,
+# which retrying can't fix.
+_TRANSIENT_GROQ_ERRORS = (APIConnectionError, APITimeoutError, RateLimitError)
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +230,24 @@ class RAGPipeline:
             model=settings.groq_model,
             api_key=settings.groq_api_key,
             max_tokens=1024,
+            temperature=0,
         )
+
+        self.fallback_llm = None
+        if settings.anthropic_api_key:
+            from langchain_anthropic import ChatAnthropic
+
+            self.fallback_llm = ChatAnthropic(model=settings.anthropic_model, temperature=0)
+
+    @retry(
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=1),
+        retry=retry_if_exception_type(_TRANSIENT_GROQ_ERRORS),
+        reraise=True,
+    )
+    async def _invoke_groq(self, messages: list) -> object:
+        """Call the Groq LLM, retrying transient failures up to 4 attempts (1s/2s/4s backoff)."""
+        return await self.llm.ainvoke(messages)
 
     async def aquery(self, question: str) -> dict:
         """Answer a natural-language safety question using RAG.
@@ -245,7 +273,12 @@ class RAGPipeline:
             ),
         ]
 
-        response = await self.llm.ainvoke(messages)
+        try:
+            response = await self._invoke_groq(messages)
+        except _TRANSIENT_GROQ_ERRORS:
+            if self.fallback_llm is None:
+                raise
+            response = await self.fallback_llm.ainvoke(messages)
         answer = response.content
 
         return {
