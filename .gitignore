@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+data/raw/
+chromadb/
+*.db
+
+# Local tool/IDE state — never shared across machines
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.idea/
+
+# Output of an unrelated codebase-graphing tool — not part of the app
+graphify-out/
