@@ -11,9 +11,9 @@ Exit codes:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
-import time
 
 # Repo root must be in sys.path so backend imports resolve.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -38,7 +38,7 @@ ROUTING_GATE: float = 80.0
 # Core evaluator
 # ---------------------------------------------------------------------------
 
-def evaluate_case(agent: SafeDistrictAgent, case: dict) -> dict:
+async def evaluate_case(agent: SafeDistrictAgent, case: dict) -> dict:
     """Run one golden query and return a result dict."""
     question = case["question"]
     expected_route = case["expected_route"]
@@ -46,13 +46,13 @@ def evaluate_case(agent: SafeDistrictAgent, case: dict) -> dict:
     must_not_contain = case["must_not_contain"]
 
     try:
-        response = agent.run(question)
+        response = await agent.arun(question)
         answer = response.get("answer", "")
         actual_route = response.get("query_type", "unknown")
     except Exception as exc:
         answer = ""
         actual_route = "error"
-        print(f"    ERROR during agent.run(): {exc}")
+        print(f"    ERROR during agent.arun(): {exc}")
 
     answer_lower = answer.lower()
 
@@ -159,7 +159,7 @@ def print_summary(results: list[dict]) -> float:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def run_evaluation() -> None:
+async def run_evaluation() -> None:
     total = len(GOLDEN_DATASET)
     print(f"Loading SafeDistrictAgent…")
     agent = SafeDistrictAgent()
@@ -169,9 +169,9 @@ def run_evaluation() -> None:
 
     for i, case in enumerate(GOLDEN_DATASET, 1):
         if i > 1:
-            time.sleep(SLEEP_BETWEEN_CALLS)
+            await asyncio.sleep(SLEEP_BETWEEN_CALLS)
         print(f"  [{i:02d}/{total}] {case['question'][:70]}")
-        result = evaluate_case(agent, case)
+        result = await evaluate_case(agent, case)
         results.append(result)
         status = "PASS" if result["passed"] else "FAIL"
         print(f"         → {status}  route={result['actual_route']}  grnd={_check(result['grounding_ok'])}  hall={_check(result['hallucination_ok'])}")
@@ -191,4 +191,4 @@ def run_evaluation() -> None:
 
 
 if __name__ == "__main__":
-    run_evaluation()
+    asyncio.run(run_evaluation())

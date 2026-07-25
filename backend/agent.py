@@ -7,6 +7,7 @@ comparison using a LangGraph ReAct agent with tool calling.
 
 from __future__ import annotations
 
+import asyncio
 import sys
 
 sys.path.insert(0, ".")
@@ -84,23 +85,23 @@ class SafeDistrictAgent:
         agent_self = self
 
         @tool
-        def query_rag_tool(question: str) -> str:
+        async def query_rag_tool(question: str) -> str:
             """Answer general crime safety questions using the RAG pipeline."""
-            result = agent_self._handle_rag(question)
+            result = await agent_self._handle_rag(question)
             agent_self._last_tool_result = result
             return result["answer"]
 
         @tool
-        def detect_anomalies_tool(question: str) -> str:
+        async def detect_anomalies_tool(question: str) -> str:
             """Detect crime anomalies, spikes, unusual patterns, or women safety concerns in the data."""
-            result = agent_self._handle_anomaly(question)
+            result = await agent_self._handle_anomaly(question)
             agent_self._last_tool_result = result
             return result["answer"]
 
         @tool
-        def compare_cities_tool(question: str) -> str:
+        async def compare_cities_tool(question: str) -> str:
             """Compare safety between two or more cities."""
-            result = agent_self._handle_compare(question)
+            result = await agent_self._handle_compare(question)
             agent_self._last_tool_result = result
             return result["answer"]
 
@@ -110,7 +111,7 @@ class SafeDistrictAgent:
     # Public entry point
     # ------------------------------------------------------------------
 
-    def run(self, question: str) -> dict:
+    async def arun(self, question: str) -> dict:
         """Invoke the ReAct agent and return a structured response dict.
 
         Returns
@@ -119,7 +120,7 @@ class SafeDistrictAgent:
             Keys: question, query_type, answer, data, sources.
         """
         self._last_tool_result = None
-        agent_output = self._react_agent.invoke({"messages": [("human", question)]})
+        agent_output = await self._react_agent.ainvoke({"messages": [("human", question)]})
         final_answer = agent_output["messages"][-1].content
 
         if self._last_tool_result is not None:
@@ -139,9 +140,9 @@ class SafeDistrictAgent:
     # Handlers
     # ------------------------------------------------------------------
 
-    def _handle_rag(self, question: str) -> dict:
+    async def _handle_rag(self, question: str) -> dict:
         try:
-            result = self.rag.query(question)
+            result = await self.rag.aquery(question)
             answer = result["answer"]
             sources = result["sources"]
             num_sources = result["num_sources"]
@@ -157,7 +158,7 @@ class SafeDistrictAgent:
             "sources": sources,
         }
 
-    def _handle_anomaly(self, question: str) -> dict:
+    async def _handle_anomaly(self, question: str) -> dict:
         if "women" in question.lower():
             anomalies = self.anomaly_engine.detect_women(self.df)
             header = f"Women-safety anomaly analysis (top {min(5, len(anomalies))} cities)"
@@ -178,7 +179,7 @@ class SafeDistrictAgent:
         anomaly_summary = "\n".join(lines) if lines else "No anomalies detected."
 
         try:
-            rag_result = self.rag.query(question)
+            rag_result = await self.rag.aquery(question)
             extra = f"\n\nAdditional context:\n{rag_result['answer']}"
             sources = rag_result["sources"]
         except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
@@ -205,13 +206,13 @@ class SafeDistrictAgent:
             "sources": sources,
         }
 
-    def _handle_compare(self, question: str) -> dict:
+    async def _handle_compare(self, question: str) -> dict:
         all_cities = list(self.df["city"].unique())
         q_lower = question.lower()
         found = [c for c in all_cities if c.lower() in q_lower]
 
         if len(found) < 2:
-            result = self._handle_rag(question)
+            result = await self._handle_rag(question)
             result["query_type"] = "compare"
             return result
 
@@ -227,7 +228,7 @@ class SafeDistrictAgent:
             )
 
         try:
-            rag_result = self.rag.compare_query(found[0], found[1])
+            rag_result = await self.rag.acompare_query(found[0], found[1])
             extra = f"\n\nDetailed analysis:\n{rag_result['answer']}"
             sources = rag_result["sources"]
         except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
@@ -252,7 +253,7 @@ class SafeDistrictAgent:
     # City report
     # ------------------------------------------------------------------
 
-    def get_city_report(self, city: str) -> dict:
+    async def get_city_report(self, city: str) -> dict:
         city_row = self.df[self.df["city"].str.lower() == city.lower()]
         city_data = city_row.to_dict(orient="records")[0] if not city_row.empty else {}
 
@@ -264,7 +265,7 @@ class SafeDistrictAgent:
         is_anomaly = any(a.city.lower() == city.lower() for a in anomalies)
 
         try:
-            rag_result = self.rag.query(f"Tell me about crime safety in {city}")
+            rag_result = await self.rag.aquery(f"Tell me about crime safety in {city}")
             rag_summary = rag_result["answer"]
         except Exception:  # noqa: BLE001 — RAG/LLM failure falls back to a message; real fix (retry+fallback) is roadmap Tier 2.
             rag_summary = ""
@@ -282,9 +283,7 @@ class SafeDistrictAgent:
 # Smoke-test entry point
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    import time
-
+async def _smoke_test() -> None:
     agent = SafeDistrictAgent()
     print("Agent ready. Testing 4 query types...")
     print("=" * 70)
@@ -298,15 +297,15 @@ if __name__ == "__main__":
 
     for i, question in enumerate(test_questions):
         if i > 0:
-            time.sleep(15)  # stay within Groq free-tier TPM limit
-        result = agent.run(question)
+            await asyncio.sleep(15)  # stay within Groq free-tier TPM limit
+        result = await agent.arun(question)
         print(f"\nQ: {question}")
         print(f"Query type: {result['query_type']}")
         print(f"Answer: {result['answer']}")
         print("-" * 70)
 
     print("\n=== City Report: Pune ===")
-    report = agent.get_city_report("Pune")
+    report = await agent.get_city_report("Pune")
     print(f"Safety score : {report['safety_score']}")
     print(f"Is anomaly   : {report['is_anomaly']}")
     print(f"RAG summary  : {report['rag_summary']}")
@@ -317,3 +316,7 @@ if __name__ == "__main__":
             f"crimes_per_lakh={cd.get('crimes_per_lakh')}, "
             f"state={cd.get('state')}"
         )
+
+
+if __name__ == "__main__":
+    asyncio.run(_smoke_test())

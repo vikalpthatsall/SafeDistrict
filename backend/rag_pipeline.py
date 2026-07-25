@@ -16,6 +16,7 @@ Every query response includes data_citation and source_url fields.
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -220,7 +221,7 @@ class RAGPipeline:
             max_tokens=1024,
         )
 
-    def query(self, question: str) -> dict:
+    async def aquery(self, question: str) -> dict:
         """Answer a natural-language safety question using RAG.
 
         Parameters
@@ -233,7 +234,7 @@ class RAGPipeline:
         dict
             Keys: question, answer, sources, num_sources, data_citation, source_url.
         """
-        retrieved = self.retriever.invoke(question)
+        retrieved = await self.retriever.ainvoke(question)
         doc_texts = [doc.page_content for doc in retrieved]
         context = "\n\n".join(doc_texts)
 
@@ -244,7 +245,7 @@ class RAGPipeline:
             ),
         ]
 
-        response = self.llm.invoke(messages)
+        response = await self.llm.ainvoke(messages)
         answer = response.content
 
         return {
@@ -256,7 +257,7 @@ class RAGPipeline:
             "source_url": _SOURCE_URL,
         }
 
-    def compare_query(
+    async def acompare_query(
         self,
         city1: str,
         city2: str,
@@ -276,23 +277,20 @@ class RAGPipeline:
         Returns
         -------
         dict
-            Same structure as query().
+            Same structure as aquery().
         """
         question = (
             f"Compare {city1} and {city2} in terms of {aspect}. "
             f"Which is safer and why?"
         )
-        return self.query(question)
+        return await self.aquery(question)
 
 
 # ---------------------------------------------------------------------------
 # Smoke-test entry point
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    sys.path.insert(0, ".")
-    load_dotenv()
-
+async def _smoke_test() -> None:
     from backend.data_loader import CrimeDataLoader
 
     loader = CrimeDataLoader()
@@ -307,12 +305,18 @@ if __name__ == "__main__":
     print("\n" + "=" * 70)
     for i, item in enumerate(test_queries, 1):
         if item[0] == "query":
-            result = pipeline.query(item[1])
+            result = await pipeline.aquery(item[1])
         else:
-            result = pipeline.compare_query(*item[1])
+            result = await pipeline.acompare_query(*item[1])
 
         print(f"\nQ{i}: {result['question']}")
         print(f"Sources used: {result['num_sources']}")
         print(f"Citation: {result['data_citation']} | {result['source_url']}")
         print(f"\nAnswer:\n{result['answer']}")
         print("=" * 70)
+
+
+if __name__ == "__main__":
+    sys.path.insert(0, ".")
+    load_dotenv()
+    asyncio.run(_smoke_test())

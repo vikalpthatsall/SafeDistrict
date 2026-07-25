@@ -31,7 +31,7 @@ class FakeAgent:
             "anomaly_count": 0,
         }
 
-    def run(self, question: str) -> dict:
+    async def arun(self, question: str) -> dict:
         return {
             "question": question,
             "query_type": "rag",
@@ -40,7 +40,7 @@ class FakeAgent:
             "sources": [],
         }
 
-    def get_city_report(self, city: str) -> dict:
+    async def get_city_report(self, city: str) -> dict:
         return {
             "city_data": {"city": city},
             "safety_score": 8.5,

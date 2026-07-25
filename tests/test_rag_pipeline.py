@@ -1,4 +1,5 @@
-from unittest.mock import Mock
+import asyncio
+from unittest.mock import AsyncMock, Mock
 
 import pandas as pd
 import pytest
@@ -79,6 +80,9 @@ def test_settings_raises_without_groq_key(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_rag_pipeline_query_shape() -> None:
+    # No pytest-asyncio in requirements.txt, so this stays a plain sync test
+    # function and drives the coroutine itself via asyncio.run(), rather than
+    # adding a new test-only dependency for one test.
     pipeline = RAGPipeline.__new__(RAGPipeline)
 
     fake_docs = [
@@ -87,12 +91,12 @@ def test_rag_pipeline_query_shape() -> None:
         Document(page_content="doc three content"),
     ]
     pipeline.retriever = Mock()
-    pipeline.retriever.invoke = Mock(return_value=fake_docs)
+    pipeline.retriever.ainvoke = AsyncMock(return_value=fake_docs)
 
     pipeline.llm = Mock()
-    pipeline.llm.invoke = Mock(return_value=Mock(content="a fake generated answer"))
+    pipeline.llm.ainvoke = AsyncMock(return_value=Mock(content="a fake generated answer"))
 
-    result = pipeline.query("Is Testville safe?")
+    result = asyncio.run(pipeline.aquery("Is Testville safe?"))
 
     assert result["question"] == "Is Testville safe?"
     assert result["answer"] == "a fake generated answer"

@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -54,6 +54,13 @@ async def lifespan(app: FastAPI):
     agent = SafeDistrictAgent()
     yield
     agent = None
+
+
+def get_agent() -> SafeDistrictAgent:
+    """FastAPI dependency: the ready agent, or a 503 if startup hasn't finished."""
+    if agent is None:
+        raise HTTPException(status_code=503, detail="Agent still starting up")
+    return agent
 
 
 # ---------------------------------------------------------------------------
@@ -152,17 +159,21 @@ def health(request: Request) -> dict:
 
 @app.post("/query")
 @limiter.limit("30/minute")
-def query(request: Request, body: QueryRequest) -> dict:
+async def query(
+    request: Request, body: QueryRequest, agent: SafeDistrictAgent = Depends(get_agent)
+) -> dict:
     """Accept a natural-language question and return an agent-routed answer."""
     try:
-        return agent.run(body.question)
+        return await agent.arun(body.question)
     except Exception as exc:
         logger.error("Query failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/cities")
-def list_cities(request: Request) -> list[dict]:
+async def list_cities(
+    request: Request, agent: SafeDistrictAgent = Depends(get_agent)
+) -> list[dict]:
     """Return all cities with their state, sorted alphabetically by city name."""
     df = agent.loader.df
     pairs = (
@@ -175,28 +186,34 @@ def list_cities(request: Request) -> list[dict]:
 
 
 @app.get("/cities/{city_name}")
-def city_report(request: Request, city_name: str) -> dict:
+async def city_report(
+    request: Request, city_name: str, agent: SafeDistrictAgent = Depends(get_agent)
+) -> dict:
     """Return a comprehensive safety report for a single city."""
     df = agent.loader.df
     match = df[df["city"].str.lower() == city_name.lower()]
     if match.empty:
         raise HTTPException(status_code=404, detail=f"City {city_name} not found")
     try:
-        return agent.get_city_report(city_name)
+        return await agent.get_city_report(city_name)
     except Exception as exc:
         logger.error("City report failed for %s: %s", city_name, exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/states")
-def list_states(request: Request) -> list[str]:
+async def list_states(
+    request: Request, agent: SafeDistrictAgent = Depends(get_agent)
+) -> list[str]:
     """Return all unique states in the dataset, sorted alphabetically."""
     df = agent.loader.df
     return sorted(df["state"].dropna().unique().tolist())
 
 
 @app.get("/states/{state_name}/cities")
-def state_cities(request: Request, state_name: str) -> list[dict]:
+async def state_cities(
+    request: Request, state_name: str, agent: SafeDistrictAgent = Depends(get_agent)
+) -> list[dict]:
     """Return all cities in a state with their safety scores."""
     df = agent.loader.df
     state_df = df[df["state"].str.lower() == state_name.lower()]
@@ -214,18 +231,22 @@ def state_cities(request: Request, state_name: str) -> list[dict]:
 
 
 @app.post("/compare")
-def compare(request: Request, body: CompareRequest) -> dict:
+async def compare(
+    request: Request, body: CompareRequest, agent: SafeDistrictAgent = Depends(get_agent)
+) -> dict:
     """Compare two cities for a given safety aspect using the agent."""
     question = f"Compare {body.city1} and {body.city2} for {body.aspect}"
     try:
-        return agent.run(question)
+        return await agent.arun(question)
     except Exception as exc:
         logger.error("Compare failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/anomalies")
-def anomalies(request: Request) -> list[dict]:
+async def anomalies(
+    request: Request, agent: SafeDistrictAgent = Depends(get_agent)
+) -> list[dict]:
     """Return all detected crime anomalies sorted by anomaly score descending."""
     try:
         results = agent.anomaly_engine.detect(agent.df)
@@ -245,7 +266,11 @@ def anomalies(request: Request) -> list[dict]:
 
 
 @app.get("/top-dangerous")
-def top_dangerous(request: Request, n: int = Query(default=5, ge=1, le=53)) -> list[dict]:
+async def top_dangerous(
+    request: Request,
+    n: int = Query(default=5, ge=1, le=53),
+    agent: SafeDistrictAgent = Depends(get_agent),
+) -> list[dict]:
     """Return top n cities by crimes_per_lakh (most dangerous first)."""
     df = agent.loader.df
     top = (
@@ -262,7 +287,9 @@ def top_dangerous(request: Request, n: int = Query(default=5, ge=1, le=53)) -> l
 
 
 @app.get("/women-safety")
-def women_safety(request: Request) -> list[dict]:
+async def women_safety(
+    request: Request, agent: SafeDistrictAgent = Depends(get_agent)
+) -> list[dict]:
     """Return top cities with anomalous women-safety crime rates (rape + kidnapping)."""
     try:
         df = agent.df
