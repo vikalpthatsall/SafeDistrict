@@ -5,11 +5,20 @@ Calls backend REST API only. Never imports backend modules directly.
 """
 
 import os
+import sys
 
+import pandas as pd
+import plotly.graph_objects as go
 import requests
 import streamlit as st
-import plotly.graph_objects as go
-import pandas as pd
+
+# Makes `frontend.labels` importable regardless of launch mode (standalone
+# `streamlit run frontend/app.py` vs. root app.py's exec() of this file for
+# HF Spaces) — both are documented as run from the repo root, so "." is
+# always correct. Same convention as backend/*.py's sys.path.insert(0, ".").
+sys.path.insert(0, ".")
+
+from frontend.labels import city_count_label
 
 BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 # Frontend never imports backend modules (see module docstring), so this
@@ -427,7 +436,8 @@ tab_dash, tab_city, tab_compare, tab_ask = st.tabs([
 # ── PAGE 1 — Dashboard ─────────────────────────────────────────────────────────
 
 with tab_dash:
-    with st.spinner("Analyzing 53 cities..."):
+    cities = get_cities()
+    with st.spinner(f"Analyzing {city_count_label(cities)}..."):
         states = get_states()
         anomalies = get_anomalies()
         top_dangerous = get_top_dangerous(10)
@@ -439,7 +449,7 @@ with tab_dash:
 
     st.markdown(f"""
 <div class="sd-page-title">India Crime Safety</div>
-<div class="sd-page-meta">53 cities monitored · {anomaly_count} anomalies detected · NCRB 2023 · IPC crimes data</div>
+<div class="sd-page-meta">{city_count_label(cities)} monitored · {anomaly_count} anomalies detected · NCRB 2023 · IPC crimes data</div>
 """, unsafe_allow_html=True)
 
     col_left, col_right = st.columns(2)
