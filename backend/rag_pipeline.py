@@ -82,7 +82,7 @@ def _min_max_normalize(scores: dict[str, float]) -> dict[str, float]:
 # Document builders
 # ---------------------------------------------------------------------------
 
-def build_crime_documents(df: pd.DataFrame) -> list[str]:
+def build_crime_documents(df: pd.DataFrame) -> list[tuple[str, dict]]:
     """Convert each city row into a human-readable text document with citation tag.
 
     Parameters
@@ -92,8 +92,10 @@ def build_crime_documents(df: pd.DataFrame) -> list[str]:
 
     Returns
     -------
-    list[str]
-        One document string per city.
+    list[tuple[str, dict]]
+        One (document text, {"city", "state", "data_quality"} metadata) pair per city —
+        parallel-list shape, matching how Chroma.from_texts()/BM25Retriever.from_texts()
+        actually take texts/metadatas rather than pre-built Document objects.
     """
     docs = []
     for _, row in df.iterrows():
@@ -118,7 +120,8 @@ def build_crime_documents(df: pd.DataFrame) -> list[str]:
             f"Crimes per lakh population: {row['crimes_per_lakh']}. "
             f"Women-specific crimes (rape + kidnapping): {women_crimes}."
         )
-        docs.append(doc)
+        metadata = {"city": row["city"], "state": row["state"], "data_quality": quality}
+        docs.append((doc, metadata))
     return docs
 
 
@@ -157,6 +160,7 @@ def _get_embeddings() -> HuggingFaceEmbeddings:
 
 def build_vector_store(
     documents: list[str],
+    metadatas: list[dict] | None = None,
     persist_dir: str = "chromadb/",
 ) -> Chroma:
     """Embed documents and persist a Chroma vector store.
@@ -165,6 +169,9 @@ def build_vector_store(
     ----------
     documents : list[str]
         Plain-text documents (city docs + optional key_findings doc).
+    metadatas : list[dict] | None
+        Parallel list of per-document metadata ({"city", "state", "data_quality"}),
+        same length/order as documents.
     persist_dir : str
         Directory path for ChromaDB persistence.
 
@@ -177,6 +184,7 @@ def build_vector_store(
     store = Chroma.from_texts(
         texts=documents,
         embedding=embeddings,
+        metadatas=metadatas,
         persist_directory=persist_dir,
         collection_name="ncrb_2023",
     )
@@ -213,6 +221,10 @@ _SYSTEM_PROMPT = (
     "Answer using ONLY the provided NCRB 2023 crime data. "
     "When data is marked [NCRB 2023 verified], cite it as verified. "
     "When data is marked [estimated from NCRB 2023 state ratios], note it is estimated. "
+    "When data is marked [estimated from NCRB 2023 national ratios — lowest confidence], "
+    "explicitly flag it as the least reliable tier — a national average applied in the "
+    "absence of any state- or city-specific ratio — rather than describing it as merely "
+    "'estimated' like the state-ratio tier. "
     "Be specific with numbers. If data is not available say so. "
     "Keep answers concise and helpful for relocation decisions."
 )
@@ -251,21 +263,26 @@ class RAGPipeline:
         # Computed unconditionally (cheap — pure string formatting) so BM25's
         # corpus always matches the current df, regardless of whether the
         # Chroma vector store is freshly built or loaded from disk.
-        documents = build_crime_documents(df)
+        doc_pairs = build_crime_documents(df)
         if key_findings:
-            documents.append(build_key_findings_document(key_findings))
+            doc_pairs.append((
+                build_key_findings_document(key_findings),
+                {"city": None, "state": None, "data_quality": "real"},
+            ))
+        documents = [text for text, _ in doc_pairs]
+        metadatas = [metadata for _, metadata in doc_pairs]
 
         store_exists = Path(persist_dir).exists() and any(Path(persist_dir).iterdir())
         if rebuild or not store_exists:
             print("Building vector store from NCRB documents...")
-            store = build_vector_store(documents, persist_dir=persist_dir)
+            store = build_vector_store(documents, metadatas=metadatas, persist_dir=persist_dir)
             print(f"  {len(documents)} documents embedded -> {persist_dir}")
         else:
             print(f"Loading existing vector store from {persist_dir}")
             store = load_vector_store(persist_dir=persist_dir)
 
         self.vector_store = store
-        self.bm25_retriever = BM25Retriever.from_texts(documents)
+        self.bm25_retriever = BM25Retriever.from_texts(documents, metadatas=metadatas)
 
         # See module docstring: requires torch (via sentence-transformers'
         # CrossEncoder), which is not in requirements-prod.txt.
@@ -305,7 +322,8 @@ class RAGPipeline:
         Returns
         -------
         list[dict]
-            Up to _CANDIDATE_POOL_SIZE {"text", "score"} dicts, score-descending.
+            Up to _CANDIDATE_POOL_SIZE {"text", "score", "metadata"} dicts,
+            score-descending.
         """
         corpus_size = len(self.bm25_retriever.docs)
 
@@ -317,17 +335,21 @@ class RAGPipeline:
             for doc, score in zip(self.bm25_retriever.docs, bm25_raw_scores)
         }
         bm25_norm = _min_max_normalize(bm25_by_text)
+        metadata_by_text = {doc.page_content: doc.metadata for doc in self.bm25_retriever.docs}
 
         vector_hits = await self.vector_store.asimilarity_search_with_relevance_scores(
             question, k=corpus_size
         )
         vector_by_text = {doc.page_content: float(score) for doc, score in vector_hits}
+        for doc, _ in vector_hits:
+            metadata_by_text.setdefault(doc.page_content, doc.metadata)
 
         combined = [
             {
                 "text": text,
                 "score": _VECTOR_WEIGHT * vector_by_text.get(text, 0.0)
                 + _BM25_WEIGHT * bm25_norm.get(text, 0.0),
+                "metadata": metadata_by_text.get(text, {}),
             }
             for text in bm25_by_text
         ]
@@ -339,14 +361,15 @@ class RAGPipeline:
 
         Each result's score is the cross-encoder's own relevance score,
         replacing the hybrid retrieval score — the whole point of reranking
-        is that it's more accurate than the initial combination.
+        is that it's more accurate than the initial combination. metadata
+        passes through unchanged.
         """
         if not candidates:
             return candidates
         pairs = [(question, c["text"]) for c in candidates]
         scores = await asyncio.to_thread(self._cross_encoder.predict, pairs)
         reranked = [
-            {"text": c["text"], "score": float(s)}
+            {"text": c["text"], "score": float(s), "metadata": c["metadata"]}
             for c, s in zip(candidates, scores)
         ]
         reranked.sort(key=lambda d: d["score"], reverse=True)
@@ -356,8 +379,8 @@ class RAGPipeline:
         """Hybrid BM25+vector retrieval, reranked to the final top _FINAL_TOP_K.
 
         Internal seam: aquery()/acompare_query() only see the returned
-        {"text", "score"} dicts and never need to know retrieval uses
-        hybrid search + reranking internally.
+        {"text", "score", "metadata"} dicts and never need to know retrieval
+        uses hybrid search + reranking internally.
         """
         candidates = await self._hybrid_search(question)
         reranked = await self._rerank(question, candidates)
@@ -375,6 +398,9 @@ class RAGPipeline:
         -------
         dict
             Keys: question, answer, sources, num_sources, data_citation, source_url.
+            Each source is {"city", "data_quality", "excerpt"} — not raw truncated
+            text — so callers know which city and confidence tier each excerpt
+            actually came from.
         """
         results = await self.retrieve(question)
         doc_texts = [r["text"] for r in results]
@@ -398,7 +424,14 @@ class RAGPipeline:
         return {
             "question": question,
             "answer": answer,
-            "sources": [t[:150] for t in doc_texts],
+            "sources": [
+                {
+                    "city": r["metadata"].get("city"),
+                    "data_quality": r["metadata"].get("data_quality"),
+                    "excerpt": r["text"][:150],
+                }
+                for r in results
+            ],
             "num_sources": len(doc_texts),
             "data_citation": _DATA_CITATION,
             "source_url": _SOURCE_URL,

@@ -68,15 +68,21 @@ def tiered_df() -> pd.DataFrame:
 
 
 def test_build_crime_documents_citation_tags(tiered_df: pd.DataFrame) -> None:
-    docs = build_crime_documents(tiered_df)
+    doc_pairs = build_crime_documents(tiered_df)
     tags = [
         "[NCRB 2023 verified]",
         "[derived from NCRB 2023 murder rates]",
         "[estimated from NCRB 2023 state ratios]",
         "[estimated from NCRB 2023 national ratios — lowest confidence]",
     ]
-    for doc, tag in zip(docs, tags):
-        assert doc.startswith(tag)
+    expected_cities = ["RealCity", "DerivedCity", "EstimatedCity", "NationalCity"]
+    expected_qualities = ["real", "derived", "estimated", "national"]
+
+    for (text, metadata), tag, city, quality in zip(
+        doc_pairs, tags, expected_cities, expected_qualities
+    ):
+        assert text.startswith(tag)
+        assert metadata == {"city": city, "state": "TestState", "data_quality": quality}
     # all four tiers must be visibly distinct citations, not just distinct data_quality values
     assert len(set(tags)) == 4
 
@@ -108,7 +114,14 @@ def _pipeline_with_mocks(fake_texts: list[str]) -> RAGPipeline:
     """
     pipeline = RAGPipeline.__new__(RAGPipeline)
     pipeline.retrieve = AsyncMock(
-        return_value=[{"text": t, "score": 1.0} for t in fake_texts]
+        return_value=[
+            {
+                "text": t,
+                "score": 1.0,
+                "metadata": {"city": f"City{i}", "state": "TestState", "data_quality": "real"},
+            }
+            for i, t in enumerate(fake_texts)
+        ]
     )
     pipeline.llm = Mock()
     pipeline.fallback_llm = None
@@ -131,6 +144,10 @@ def test_rag_pipeline_query_shape() -> None:
     assert len(result["sources"]) == len(fake_texts)
     assert "data_citation" in result
     assert "source_url" in result
+    # sources are structured (city/tier/excerpt), not truncated raw text
+    for source in result["sources"]:
+        assert set(source) == {"city", "data_quality", "excerpt"}
+        assert source["data_quality"] == "real"
     # successful first attempt — retry must not fire extra calls
     assert pipeline.llm.ainvoke.call_count == 1
 
@@ -171,8 +188,14 @@ def test_hybrid_search_combines_bm25_and_vector_scores() -> None:
     ]
     query = "Delhi crime"
 
+    metadatas = [
+        {"city": "Mumbai", "state": "Maharashtra", "data_quality": "real"},
+        {"city": "Delhi", "state": "Delhi", "data_quality": "estimated"},
+        {"city": "Pune", "state": "Maharashtra", "data_quality": "derived"},
+    ]
+
     pipeline = RAGPipeline.__new__(RAGPipeline)
-    pipeline.bm25_retriever = BM25Retriever.from_texts(corpus)
+    pipeline.bm25_retriever = BM25Retriever.from_texts(corpus, metadatas=metadatas)
 
     # Compute BM25's real scores independently, via the same retriever
     # instance _hybrid_search will use — this checks the *combination
@@ -193,11 +216,14 @@ def test_hybrid_search_combines_bm25_and_vector_scores() -> None:
 
     results = asyncio.run(pipeline._hybrid_search(query))
     scores_by_text = {r["text"]: r["score"] for r in results}
+    metadata_by_text = {r["text"]: r["metadata"] for r in results}
 
     assert set(scores_by_text) == set(corpus)
-    for text in corpus:
+    for text, metadata in zip(corpus, metadatas):
         expected = 0.6 * vector_scores[text] + 0.4 * bm25_norm[text]
         assert scores_by_text[text] == pytest.approx(expected)
+        # metadata attached at index time (via BM25Retriever) surfaces on each result
+        assert metadata_by_text[text] == metadata
 
 
 # ---------------------------------------------------------------------------
@@ -209,9 +235,21 @@ def test_rerank_changes_top5_order() -> None:
     # above an exact keyword match for "Delhi crime" — a realistic failure
     # mode for vector/BM25 blending alone.
     candidates = [
-        {"text": "Family-friendly neighborhoods with good schools nearby", "score": 0.8},
-        {"text": "Delhi crime rate: 506 murders, 1088 rapes reported in 2023", "score": 0.5},
-        {"text": "Pune is quiet and pleasant for relocation", "score": 0.3},
+        {
+            "text": "Family-friendly neighborhoods with good schools nearby",
+            "score": 0.8,
+            "metadata": {"city": "Mumbai", "state": "Maharashtra", "data_quality": "real"},
+        },
+        {
+            "text": "Delhi crime rate: 506 murders, 1088 rapes reported in 2023",
+            "score": 0.5,
+            "metadata": {"city": "Delhi", "state": "Delhi", "data_quality": "real"},
+        },
+        {
+            "text": "Pune is quiet and pleasant for relocation",
+            "score": 0.3,
+            "metadata": {"city": "Pune", "state": "Maharashtra", "data_quality": "estimated"},
+        },
     ]
 
     pipeline = RAGPipeline.__new__(RAGPipeline)
@@ -225,3 +263,5 @@ def test_rerank_changes_top5_order() -> None:
     assert [r["text"] for r in reranked] != [c["text"] for c in candidates]
     assert reranked[0]["text"] == candidates[1]["text"]
     assert reranked[0]["score"] == pytest.approx(0.95)
+    # metadata carries through reranking unchanged
+    assert reranked[0]["metadata"] == candidates[1]["metadata"]

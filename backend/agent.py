@@ -19,11 +19,38 @@ load_dotenv()
 from langchain_core.messages import SystemMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
+from rapidfuzz import fuzz, process
 
 from backend.anomaly_engine import AnomalyEngine
 from backend.config import get_settings
 from backend.data_loader import CrimeDataLoader
 from backend.rag_pipeline import RAGPipeline
+
+# _handle_compare's fuzzy fallback: exact substring matching is the fast
+# path; below this rapidfuzz token_sort_ratio score, a word is treated as
+# too dissimilar to be that city (avoids false positives on unrelated
+# question words). ~85 catches real typos (e.g. "Nagpuur" -> Nagpur, 92) but
+# not historical/alternate names (e.g. "Poonah" vs "Pune" scores only 40) —
+# those are handled separately, by _CITY_ALIASES below.
+_FUZZY_MATCH_THRESHOLD = 85
+
+# Historical/colonial-era and other common alternate names, checked before
+# exact and fuzzy matching in _find_cities(). These aren't typos — they're
+# genuinely different words from the current name (see _FUZZY_MATCH_THRESHOLD
+# above), so fuzzy matching can't and shouldn't be loosened to catch them.
+# Only includes names confirmed to have a distinct, real target in
+# data_loader.py's city list (checked directly, not assumed) — e.g. "Bhopal"
+# has no old-name alias worth adding since it was never renamed.
+_CITY_ALIASES = {
+    "bangalore": "Bengaluru",
+    "bombay": "Mumbai",
+    "poona": "Pune",
+    "poonah": "Pune",
+    "cochin": "Kochi",
+    "calcutta": "Kolkata",
+    "madras": "Chennai",
+    "trivandrum": "Thiruvananthapuram",
+}
 
 _SYSTEM_PROMPT = (
     "You are SafeDistrict AI, a crime safety assistant for Indian cities. "
@@ -206,10 +233,47 @@ class SafeDistrictAgent:
             "sources": sources,
         }
 
+    @staticmethod
+    def _find_cities(question: str, all_cities: list[str]) -> list[str]:
+        """Find city names mentioned in the question.
+
+        Checked in order: historical/alternate names (_CITY_ALIASES), then
+        exact substring matching — both fast paths. Only when those together
+        find fewer than 2 cities does it fall back to fuzzy matching
+        (rapidfuzz token_sort_ratio, threshold _FUZZY_MATCH_THRESHOLD) of
+        individual question words against the remaining city names, to catch
+        typos neither of the above can.
+        """
+        q_lower = question.lower()
+        found = []
+        for alias, canonical in _CITY_ALIASES.items():
+            if alias in q_lower and canonical in all_cities and canonical not in found:
+                found.append(canonical)
+        for city in all_cities:
+            if city.lower() in q_lower and city not in found:
+                found.append(city)
+        if len(found) >= 2:
+            return found
+
+        remaining = [c for c in all_cities if c not in found]
+        for word in question.split():
+            if not remaining:
+                break
+            match = process.extractOne(
+                word,
+                remaining,
+                scorer=fuzz.token_sort_ratio,
+                score_cutoff=_FUZZY_MATCH_THRESHOLD,
+            )
+            if match:
+                city = match[0]
+                found.append(city)
+                remaining.remove(city)
+        return found
+
     async def _handle_compare(self, question: str) -> dict:
         all_cities = list(self.df["city"].unique())
-        q_lower = question.lower()
-        found = [c for c in all_cities if c.lower() in q_lower]
+        found = self._find_cities(question, all_cities)
 
         if len(found) < 2:
             result = await self._handle_rag(question)

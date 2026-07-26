@@ -928,8 +928,12 @@ with tab_ask:
             if sources:
                 with st.expander("Sources used"):
                     for src in sources:
+                        city = src.get("city") or "General"
+                        quality = src.get("data_quality", "")
+                        excerpt = src.get("excerpt", "")
+                        tier_label = f" · {quality}" if quality else ""
                         st.markdown(f"""
 <div class="sd-panel" style="padding:12px 16px;margin-bottom:6px">
-  <div style="font-size:13px;color:#8888aa">{src}</div>
+  <div style="font-size:13px;color:#8888aa"><strong>{city}</strong>{tier_label}<br>{excerpt}</div>
 </div>
 """, unsafe_allow_html=True)

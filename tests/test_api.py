@@ -109,3 +109,57 @@ def test_top_dangerous(client: TestClient) -> None:
     assert len(body) <= 2
     if body:
         assert "safety_score" in body[0]
+
+
+# ---------------------------------------------------------------------------
+# /query and /compare — previously untested through the real ASGI layer.
+# FakeAgent.arun already existed (Session 12) but no test ever called these
+# two routes; both go through Depends(get_agent) and identical
+# try/except -> HTTPException(500) handling in main.py.
+# ---------------------------------------------------------------------------
+
+def test_query_success(client: TestClient) -> None:
+    response = client.post("/query", json={"question": "Is Delhi safe?"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["answer"] == "fake answer"
+    assert body["query_type"] == "rag"
+
+
+def test_query_agent_error_returns_500(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    import backend.main as main_module
+
+    async def raise_error(question: str) -> dict:
+        raise RuntimeError("groq is down")
+
+    monkeypatch.setattr(main_module.agent, "arun", raise_error)
+
+    response = client.post("/query", json={"question": "Is Delhi safe?"})
+
+    assert response.status_code == 500
+    assert "groq is down" in response.json()["detail"]
+
+
+def test_compare_success(client: TestClient) -> None:
+    response = client.post(
+        "/compare", json={"city1": "TestCity", "city2": "OtherCity", "aspect": "overall safety"}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["answer"] == "fake answer"
+
+
+def test_compare_agent_error_returns_500(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    import backend.main as main_module
+
+    async def raise_error(question: str) -> dict:
+        raise RuntimeError("groq is down")
+
+    monkeypatch.setattr(main_module.agent, "arun", raise_error)
+
+    response = client.post(
+        "/compare", json={"city1": "TestCity", "city2": "OtherCity", "aspect": "overall safety"}
+    )
+
+    assert response.status_code == 500
+    assert "groq is down" in response.json()["detail"]

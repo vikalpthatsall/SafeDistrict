@@ -29,7 +29,9 @@ langgraph==1.1.8
 langgraph-prebuilt==1.0.10
 
 # Retrieval — hybrid search (BM25Retriever needs langchain-community above)
+# and fuzzy city-name matching in agent.py's _handle_compare
 rank_bm25==0.2.2
+rapidfuzz==3.14.5
 
 # Vector DB
 chromadb==1.5.8

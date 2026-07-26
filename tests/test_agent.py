@@ -59,16 +59,41 @@ def test_handle_compare_two_real_cities(agent: SafeDistrictAgent) -> None:
     assert "Pune" in cities_in_data
 
 
-def test_handle_compare_unrecognized_city_falls_back_to_rag(agent: SafeDistrictAgent) -> None:
-    # Known limitation (roadmap Tier 3): _handle_compare finds cities via naive
-    # substring matching against question text, not fuzzy/embedding matching.
-    # "Poonah" (misspelled) never matches a real city, so only "Nagpur" matches —
-    # fewer than 2 found cities — and this falls back to the RAG path rather
-    # than raising or silently producing a one-city "comparison". Once
-    # embedding-based matching lands, this test's expected behavior should
-    # change to a real two-city comparison; that's the point of asserting the
-    # fallback explicitly now rather than leaving it uncovered.
+def test_handle_compare_fuzzy_typo_resolves(agent: SafeDistrictAgent) -> None:
+    # _handle_compare now falls back to rapidfuzz (token_sort_ratio, threshold
+    # ~85) when exact substring matching finds fewer than 2 cities. "Nagpuur"
+    # is a realistic typo (doubled letter) that exact matching can't find —
+    # "nagpur" isn't a substring of "nagpuur" — but scores 92 against "Nagpur",
+    # comfortably clearing the threshold, so this now resolves to a real
+    # two-city comparison instead of falling back to RAG.
+    result = asyncio.run(agent._handle_compare("Compare Nagpuur and Pune for safety"))
+    assert result["query_type"] == "compare"
+    cities_in_data = {d["city"] for d in result["data"]}
+    assert "Nagpur" in cities_in_data
+    assert "Pune" in cities_in_data
+
+
+def test_handle_compare_alias_resolves(agent: SafeDistrictAgent) -> None:
+    # "Poonah" is the old colonial-era name for Pune — not a typo (token_sort_ratio
+    # scores it only 40 against "Pune", far below the fuzzy threshold; verified
+    # directly), so it needed its own alias table rather than a loosened fuzzy
+    # threshold. _CITY_ALIASES is checked before both exact and fuzzy matching,
+    # so this now resolves to a real two-city comparison — closing the gap this
+    # exact example was previously used to document as unresolved.
     result = asyncio.run(agent._handle_compare("Compare Poonah and Nagpur"))
+    assert result["query_type"] == "compare"
+    cities_in_data = {d["city"] for d in result["data"]}
+    assert "Pune" in cities_in_data
+    assert "Nagpur" in cities_in_data
+
+
+def test_handle_compare_unresolvable_falls_back_to_rag(agent: SafeDistrictAgent) -> None:
+    # "Zzqvwx" matches no alias, no exact substring, and no real city above
+    # the fuzzy threshold (best fuzzy match against the real city list scores
+    # only ~15; verified directly) — only "Nagpur" resolves, still fewer than
+    # 2 cities, so this is the genuine "we truly can't find a 2nd city" case,
+    # still falling back to the RAG path.
+    result = asyncio.run(agent._handle_compare("Compare Zzqvwx and Nagpur"))
     assert result["query_type"] == "compare"
     assert isinstance(result["data"], dict)
     assert "num_sources" in result["data"]
