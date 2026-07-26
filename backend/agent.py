@@ -8,6 +8,7 @@ comparison using a LangGraph ReAct agent with tool calling.
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 
 sys.path.insert(0, ".")
@@ -25,6 +26,8 @@ from backend.anomaly_engine import AnomalyEngine
 from backend.config import get_settings
 from backend.data_loader import CrimeDataLoader
 from backend.rag_pipeline import RAGPipeline
+
+logger = logging.getLogger(__name__)
 
 # _handle_compare's fuzzy fallback: exact substring matching is the fast
 # path; below this rapidfuzz token_sort_ratio score, a word is treated as
@@ -150,11 +153,16 @@ class SafeDistrictAgent:
         agent_output = await self._react_agent.ainvoke({"messages": [("human", question)]})
         final_answer = agent_output["messages"][-1].content
 
+        # query_type is the single most useful "why did I get this kind of
+        # answer" signal available at this layer — not the question/answer
+        # text itself, which stays out of logs (see Session 17 notes).
         if self._last_tool_result is not None:
             base = dict(self._last_tool_result)
             base["answer"] = final_answer
+            logger.info("arun routed via tool call -> query_type=%s", base.get("query_type"))
             return base
 
+        logger.info("arun routed to plain LLM response -> query_type=rag (no tool called)")
         return {
             "question": question,
             "query_type": "rag",
@@ -276,6 +284,12 @@ class SafeDistrictAgent:
         found = self._find_cities(question, all_cities)
 
         if len(found) < 2:
+            # City names are not sensitive (real Indian cities), but the
+            # question text itself stays out of logs — see arun()'s note.
+            logger.info(
+                "_handle_compare found only %d city/cities (%s) — falling back to RAG",
+                len(found), found,
+            )
             result = await self._handle_rag(question)
             result["query_type"] = "compare"
             return result
@@ -348,9 +362,12 @@ class SafeDistrictAgent:
 # ---------------------------------------------------------------------------
 
 async def _smoke_test() -> None:
+    # This smoke test's whole purpose is displaying real Q&A content for
+    # manual review, unlike the production request-logging paths elsewhere
+    # (arun(), _handle_compare()), which deliberately avoid logging
+    # question/answer text.
     agent = SafeDistrictAgent()
-    print("Agent ready. Testing 4 query types...")
-    print("=" * 70)
+    logger.info("Agent ready. Testing 4 query types...")
 
     test_questions = [
         "Is Mumbai safe for families?",
@@ -363,24 +380,28 @@ async def _smoke_test() -> None:
         if i > 0:
             await asyncio.sleep(15)  # stay within Groq free-tier TPM limit
         result = await agent.arun(question)
-        print(f"\nQ: {question}")
-        print(f"Query type: {result['query_type']}")
-        print(f"Answer: {result['answer']}")
-        print("-" * 70)
+        logger.info(
+            "Q: %s\nQuery type: %s\nAnswer: %s",
+            question, result["query_type"], result["answer"],
+        )
 
-    print("\n=== City Report: Pune ===")
     report = await agent.get_city_report("Pune")
-    print(f"Safety score : {report['safety_score']}")
-    print(f"Is anomaly   : {report['is_anomaly']}")
-    print(f"RAG summary  : {report['rag_summary']}")
+    city_data_msg = ""
     if report["city_data"]:
         cd = report["city_data"]
-        print(
-            f"City data    : total_ipc={cd.get('total_ipc')}, "
-            f"crimes_per_lakh={cd.get('crimes_per_lakh')}, "
-            f"state={cd.get('state')}"
+        city_data_msg = (
+            f"\nCity data    : total_ipc={cd.get('total_ipc')}, "
+            f"crimes_per_lakh={cd.get('crimes_per_lakh')}, state={cd.get('state')}"
         )
+    logger.info(
+        "City Report: Pune\nSafety score : %s\nIs anomaly   : %s\nRAG summary  : %s%s",
+        report["safety_score"], report["is_anomaly"], report["rag_summary"], city_data_msg,
+    )
 
 
 if __name__ == "__main__":
+    # Standalone smoke-test run (python -m backend.agent) never imports
+    # main.py, so without this, logger.info() above would be entirely
+    # silent — verified directly, not assumed.
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(_smoke_test())

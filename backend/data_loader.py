@@ -8,6 +8,7 @@ Tiered quality for crime counts:
   national  — national average ratio × total IPC (fallback only)
 """
 
+import logging
 import sys
 
 import pandas as pd
@@ -23,6 +24,8 @@ from data.processed.ncrb_2023_verified import (
     NCRB_2023_RAPE,
     NCRB_2023_STATE_RATIOS,
 )
+
+logger = logging.getLogger(__name__)
 
 _CITY_STATE = {
     "Agra": "Uttar Pradesh",
@@ -415,31 +418,40 @@ class CrimeDataLoader:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Standalone smoke-test run (python -m backend.data_loader) never imports
+    # main.py, so without this, logger.info() below would be entirely
+    # silent — verified directly, not assumed.
+    logging.basicConfig(level=logging.INFO)
+
     loader = CrimeDataLoader()
-    print(f"Loaded {len(loader)} cities")
-    print(f"Columns: {loader.df.columns.tolist()}")
+    logger.info("Loaded %d cities", len(loader))
+    logger.info("Columns: %s", loader.df.columns.tolist())
 
     dc = loader.get_city("Delhi City")
     if not dc.empty:
         row = dc.iloc[0]
-        print(f"\nDelhi City murder={row['murder']} (quality={row['murder_quality']})")
-        print(f"Delhi City rape={row['rape']} (quality={row['rape_quality']})")
+        logger.info("Delhi City murder=%s (quality=%s)", row["murder"], row["murder_quality"])
+        logger.info("Delhi City rape=%s (quality=%s)", row["rape"], row["rape_quality"])
         assert row["murder"] == 506, f"Expected 506, got {row['murder']}"
         assert row["rape"] == 1088, f"Expected 1088, got {row['rape']}"
-        print("  Delhi murder/rape assertions PASSED")
+        logger.info("Delhi murder/rape assertions PASSED")
 
     bc = loader.get_city("Bengaluru")
     if not bc.empty:
         row = bc.iloc[0]
-        print(f"\nBengaluru kidnapping={row['kidnapping']} (quality={row['kidnapping_quality']})")
+        logger.info("Bengaluru kidnapping=%s (quality=%s)", row["kidnapping"], row["kidnapping_quality"])
         assert row["kidnapping"] == 1203, f"Expected 1203, got {row['kidnapping']}"
-        print("  Bengaluru kidnapping assertion PASSED")
+        logger.info("Bengaluru kidnapping assertion PASSED")
 
-    print("\n--- Maharashtra ---")
-    print(loader.get_state("Maharashtra")[["city", "crimes_per_lakh", "data_quality"]].to_string(index=False))
-
-    print("\n--- Top 5 by crimes_per_lakh ---")
-    print(loader.get_top_crimes(5)[["city", "crimes_per_lakh", "murder", "rape", "data_quality"]].to_string(index=False))
-
-    print("\n--- Top 5 women-risk cities ---")
-    print(loader.get_women_risk_cities(5)[["city", "rape", "kidnapping", "rape_quality", "kidnapping_quality"]].to_string(index=False))
+    logger.info(
+        "Maharashtra:\n%s",
+        loader.get_state("Maharashtra")[["city", "crimes_per_lakh", "data_quality"]].to_string(index=False),
+    )
+    logger.info(
+        "Top 5 by crimes_per_lakh:\n%s",
+        loader.get_top_crimes(5)[["city", "crimes_per_lakh", "murder", "rape", "data_quality"]].to_string(index=False),
+    )
+    logger.info(
+        "Top 5 women-risk cities:\n%s",
+        loader.get_women_risk_cities(5)[["city", "rape", "kidnapping", "rape_quality", "kidnapping_quality"]].to_string(index=False),
+    )

@@ -6,6 +6,7 @@ Exposes AnomalyEngine (fit/detect/compare) and a standalone women-safety helper.
 
 from __future__ import annotations
 
+import logging
 import sys
 from dataclasses import dataclass, field
 
@@ -13,6 +14,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # AnomalyResult dataclass
@@ -408,6 +411,11 @@ def detect_women_safety_anomalies(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Standalone smoke-test run (python -m backend.anomaly_engine) never
+    # imports main.py, so without this, logger.info() below would be
+    # entirely silent — verified directly, not assumed.
+    logging.basicConfig(level=logging.INFO)
+
     sys.path.insert(0, ".")
     from backend.data_loader import CrimeDataLoader
 
@@ -418,35 +426,31 @@ if __name__ == "__main__":
     engine.fit(df)
 
     anomalies = engine.detect(df)
-    print(f"\n{'='*60}")
-    print(f"Total anomalies detected: {len(anomalies)}")
-    print(f"{'='*60}")
+    logger.info("Total anomalies detected: %d", len(anomalies))
 
-    print("\n--- Top 5 Anomalies ---")
-    for i, a in enumerate(anomalies[:5], 1):
-        print(f"  {i}. {a}")
+    top5_lines = [f"  {i}. {a}" for i, a in enumerate(anomalies[:5], 1)]
+    logger.info("Top 5 Anomalies:\n%s", "\n".join(top5_lines))
 
     compare_cities = ["Pune", "Mumbai", "Delhi City", "Bengaluru", "Jaipur"]
-    print(f"\n--- City Comparison: {compare_cities} ---")
     comparison = engine.compare_cities(df, compare_cities)
-    print(f"  {'City':<18} {'State':<20} {'Safety':>7} {'Risk':<8} {'Crimes/Lakh':>12} {'Anomalies':>10}")
-    print(f"  {'-'*80}")
-    for c in comparison:
-        print(
-            f"  {c['city']:<18} {c['state']:<20} "
-            f"{c['safety_score']:>7.2f} {c['risk_level']:<8} "
-            f"{c['avg_crimes_per_lakh']:>12.2f} {c['anomaly_count']:>10}"
-        )
+    comparison_lines = [
+        f"  {'City':<18} {'State':<20} {'Safety':>7} {'Risk':<8} {'Crimes/Lakh':>12} {'Anomalies':>10}",
+        f"  {'-'*80}",
+    ] + [
+        f"  {c['city']:<18} {c['state']:<20} "
+        f"{c['safety_score']:>7.2f} {c['risk_level']:<8} "
+        f"{c['avg_crimes_per_lakh']:>12.2f} {c['anomaly_count']:>10}"
+        for c in comparison
+    ]
+    logger.info("City Comparison %s:\n%s", compare_cities, "\n".join(comparison_lines))
 
-    print("\n--- Maharashtra State Summary ---")
     summary = engine.get_state_summary(df, "Maharashtra")
-    for k, v in summary.items():
-        print(f"  {k}: {v}")
+    summary_lines = [f"  {k}: {v}" for k, v in summary.items()]
+    logger.info("Maharashtra State Summary:\n%s", "\n".join(summary_lines))
 
-    print("\n--- Top 5 Women Safety Anomalies ---")
     women_anomalies = detect_women_safety_anomalies(df, engine, top_n=5)
     if women_anomalies:
-        for i, a in enumerate(women_anomalies, 1):
-            print(f"  {i}. {a}")
+        women_lines = [f"  {i}. {a}" for i, a in enumerate(women_anomalies, 1)]
+        logger.info("Top 5 Women Safety Anomalies:\n%s", "\n".join(women_lines))
     else:
-        print("  No women-safety anomalies detected.")
+        logger.info("No women-safety anomalies detected.")

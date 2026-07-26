@@ -6,9 +6,12 @@ Exposes REST endpoints consumed by the Streamlit frontend.
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
+import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 sys.path.insert(0, ".")
 
@@ -29,10 +32,35 @@ from backend.agent import SafeDistrictAgent
 from backend.config import get_settings
 
 # ---------------------------------------------------------------------------
-# Logging
+# Logging — one JSON object per line. No new dependency (python-json-logger
+# isn't in requirements.txt): this is a small enough formatter to write
+# directly rather than add a library for it.
+#
+# basicConfig configures the *root* logger's handler, which every module
+# logger (backend.agent, backend.rag_pipeline, etc. — each just
+# logging.getLogger(__name__)) propagates to by default, so this one
+# formatter covers the whole app's log output, not just main.py's own
+# logger calls.
 # ---------------------------------------------------------------------------
 
-logging.basicConfig(level=logging.INFO)
+class _JSONFormatter(logging.Formatter):
+    """Minimal structured formatter: timestamp, level, logger name, message."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(payload)
+
+
+_json_handler = logging.StreamHandler()
+_json_handler.setFormatter(_JSONFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[_json_handler])
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -127,8 +155,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next) -> Response:
+    # Deliberately generic — method/path/status/latency only, no headers
+    # (would risk logging the X-API-Key header from Session 16) and no
+    # request/response body (would risk logging question/answer text, and
+    # this layer has no visibility into route-internal detail like
+    # query_type/num_sources/retries anyway — that's logged from inside
+    # agent.py/rag_pipeline.py instead, where it's actually available).
+    start = time.perf_counter()
     response = await call_next(request)
-    logger.info("%s %s — %d", request.method, request.url.path, response.status_code)
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info(
+        "%s %s — %d (%.1fms)",
+        request.method, request.url.path, response.status_code, duration_ms,
+    )
     return response
 
 

@@ -27,6 +27,7 @@ Every query response includes data_citation and source_url fields.
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
@@ -39,6 +40,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from tenacity import (
+    before_sleep_log,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
@@ -46,6 +48,8 @@ from tenacity import (
 )
 
 from backend.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 _DATA_CITATION = "NCRB Crime in India 2023"
 _SOURCE_URL = "https://data.opencity.in/dataset/crime-in-india-2023"
@@ -274,11 +278,11 @@ class RAGPipeline:
 
         store_exists = Path(persist_dir).exists() and any(Path(persist_dir).iterdir())
         if rebuild or not store_exists:
-            print("Building vector store from NCRB documents...")
+            logger.info("Building vector store from NCRB documents...")
             store = build_vector_store(documents, metadatas=metadatas, persist_dir=persist_dir)
-            print(f"  {len(documents)} documents embedded -> {persist_dir}")
+            logger.info("%d documents embedded -> %s", len(documents), persist_dir)
         else:
-            print(f"Loading existing vector store from {persist_dir}")
+            logger.info("Loading existing vector store from %s", persist_dir)
             store = load_vector_store(persist_dir=persist_dir)
 
         self.vector_store = store
@@ -308,6 +312,7 @@ class RAGPipeline:
         wait=wait_exponential(multiplier=1),
         retry=retry_if_exception_type(_TRANSIENT_GROQ_ERRORS),
         reraise=True,
+        before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     async def _invoke_groq(self, messages: list) -> object:
         """Call the Groq LLM, retrying transient failures up to 4 attempts (1s/2s/4s backoff)."""
@@ -405,6 +410,11 @@ class RAGPipeline:
         results = await self.retrieve(question)
         doc_texts = [r["text"] for r in results]
         context = "\n\n".join(doc_texts)
+        # Not logging the question/answer text itself — see module notes on
+        # Session 16/17 secret- and content-logging hygiene. num_sources is
+        # the useful-for-debugging-a-bad-answer signal (e.g. 0 sources
+        # retrieved explains a generic/ungrounded answer).
+        logger.info("RAG retrieval returned %d sources", len(doc_texts))
 
         messages = [
             SystemMessage(content=_SYSTEM_PROMPT),
@@ -418,6 +428,7 @@ class RAGPipeline:
         except _TRANSIENT_GROQ_ERRORS:
             if self.fallback_llm is None:
                 raise
+            logger.warning("Groq exhausted retries; falling back to Anthropic for this query")
             response = await self.fallback_llm.ainvoke(messages)
         answer = response.content
 
@@ -482,21 +493,27 @@ async def _smoke_test() -> None:
         ("compare", ("Pune", "Mumbai")),
     ]
 
-    print("\n" + "=" * 70)
     for i, item in enumerate(test_queries, 1):
         if item[0] == "query":
             result = await pipeline.aquery(item[1])
         else:
             result = await pipeline.acompare_query(*item[1])
 
-        print(f"\nQ{i}: {result['question']}")
-        print(f"Sources used: {result['num_sources']}")
-        print(f"Citation: {result['data_citation']} | {result['source_url']}")
-        print(f"\nAnswer:\n{result['answer']}")
-        print("=" * 70)
+        logger.info(
+            "Q%d: %s\nSources used: %s\nCitation: %s | %s\nAnswer:\n%s\n%s",
+            i, result["question"], result["num_sources"],
+            result["data_citation"], result["source_url"], result["answer"], "=" * 70,
+        )
 
 
 if __name__ == "__main__":
+    # Standalone smoke-test run (python -m backend.rag_pipeline) never
+    # imports main.py, so without this, logger.info() below would be
+    # entirely silent — verified directly, not assumed. This smoke test's
+    # whole purpose is displaying real Q&A content for manual review, unlike
+    # the production request-logging paths elsewhere, which deliberately
+    # avoid logging question/answer text.
+    logging.basicConfig(level=logging.INFO)
     sys.path.insert(0, ".")
     load_dotenv()
     asyncio.run(_smoke_test())
