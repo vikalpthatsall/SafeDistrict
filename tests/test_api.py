@@ -50,8 +50,32 @@ class FakeAgent:
         }
 
 
+# Matches conftest.py's BACKEND_API_KEY placeholder — every route except
+# /health now requires this via the X-API-Key header.
+AUTH_HEADERS = {"X-API-Key": "test-placeholder-api-key-not-real"}
+
+
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("backend.main.SafeDistrictAgent", FakeAgent)
+    from backend.main import app
+
+    # Default headers on the TestClient itself (not per-call) so every
+    # existing test below keeps working unchanged.
+    with TestClient(app, headers=AUTH_HEADERS) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def bare_client(monkeypatch: pytest.MonkeyPatch):
+    """Same as `client`, but with no default headers at all.
+
+    Needed specifically for the missing-API-key test: httpx's TestClient
+    merges per-call `headers=` with the client's own defaults rather than
+    replacing them, and rejects `{"X-API-Key": None}` outright (verified
+    directly) — so `client.get(..., headers={})` would still silently send
+    the default X-API-Key and can't be used to test the no-header case.
+    """
     monkeypatch.setattr("backend.main.SafeDistrictAgent", FakeAgent)
     from backend.main import app
 
@@ -136,8 +160,41 @@ def test_query_agent_error_returns_500(client: TestClient, monkeypatch: pytest.M
 
     response = client.post("/query", json={"question": "Is Delhi safe?"})
 
+    # Session 16 scrubs raw exception text from the response — the real
+    # message ("groq is down") is logged server-side, not returned to the
+    # client. Confirm the leak doesn't happen and a generic message does.
     assert response.status_code == 500
-    assert "groq is down" in response.json()["detail"]
+    body = response.json()
+    assert "groq is down" not in body["detail"]
+    assert body["detail"] == "Internal server error"
+
+
+# ---------------------------------------------------------------------------
+# API key auth (Session 16) — every route except /health requires the
+# correct X-API-Key header. /cities is representative of the other 8
+# protected routes; verify_api_key doesn't vary by route.
+# ---------------------------------------------------------------------------
+
+def test_protected_route_no_api_key_returns_401(bare_client: TestClient) -> None:
+    # x_api_key is optional at the FastAPI level specifically so a fully
+    # missing header still reaches verify_api_key's own check and returns
+    # 401 here, rather than FastAPI's own 422 for a missing required header.
+    response = bare_client.get("/cities")
+    assert response.status_code == 401
+
+
+def test_protected_route_wrong_api_key_returns_401(client: TestClient) -> None:
+    response = client.get("/cities", headers={"X-API-Key": "wrong-key"})
+    assert response.status_code == 401
+
+
+def test_protected_route_correct_api_key_succeeds(client: TestClient) -> None:
+    # `client` already sends the correct key by default (see the fixture) —
+    # every other test in this file is implicitly this case too, but this
+    # one asserts it explicitly, matching the "correct key -> normal
+    # response" case requested alongside the two 401 cases above.
+    response = client.get("/cities", headers=AUTH_HEADERS)
+    assert response.status_code == 200
 
 
 def test_compare_success(client: TestClient) -> None:
@@ -161,5 +218,10 @@ def test_compare_agent_error_returns_500(client: TestClient, monkeypatch: pytest
         "/compare", json={"city1": "TestCity", "city2": "OtherCity", "aspect": "overall safety"}
     )
 
+    # Session 16 scrubs raw exception text from the response — the real
+    # message ("groq is down") is logged server-side, not returned to the
+    # client. Confirm the leak doesn't happen and a generic message does.
     assert response.status_code == 500
-    assert "groq is down" in response.json()["detail"]
+    body = response.json()
+    assert "groq is down" not in body["detail"]
+    assert body["detail"] == "Internal server error"

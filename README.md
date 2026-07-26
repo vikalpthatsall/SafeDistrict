@@ -128,6 +128,7 @@ echo "ANTHROPIC_API_KEY=your_anthropic_key_here" >> .env
 ```
 - `GROQ_API_KEY` is **required** — `RAGPipeline` uses `llama-3.3-70b-versatile` via Groq for answer generation regardless of what else is set. Get a free key at [console.groq.com](https://console.groq.com).
 - `ANTHROPIC_API_KEY` is **optional** — if present, `agent.py` uses `claude-sonnet-4-6` for the orchestration/routing layer instead of falling back to Groq for that step. Both keys can be set at once; they drive different parts of the pipeline.
+- `BACKEND_API_KEY` is **required** — a shared secret of your choosing (e.g. `openssl rand -hex 32`). Every backend route except `/health` requires it via an `X-API-Key` header; the Streamlit frontend reads this same variable and sends it automatically. Set the *same* value for both the backend and frontend processes/containers.
 
 **3. Run the backend**
 ```bash

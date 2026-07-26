@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -61,6 +61,23 @@ def get_agent() -> SafeDistrictAgent:
     if agent is None:
         raise HTTPException(status_code=503, detail="Agent still starting up")
     return agent
+
+
+def verify_api_key(x_api_key: str | None = Header(default=None)) -> None:
+    """FastAPI dependency: the correct X-API-Key header, or a 401.
+
+    Applied to every route except /health — uptime monitors and Docker's own
+    HEALTHCHECK shouldn't need a key just to confirm the service is up.
+
+    x_api_key is optional at the FastAPI level (not Header(...)) so a
+    completely missing header still reaches this check and returns 401 —
+    Header(...) (required) would make FastAPI reject a missing header with
+    422 before this function ever runs, which is the wrong status code for
+    an auth failure and would contradict "missing key" and "wrong key"
+    behaving the same way.
+    """
+    if x_api_key is None or x_api_key != get_settings().backend_api_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +174,7 @@ def health(request: Request) -> dict:
     }
 
 
-@app.post("/query")
+@app.post("/query", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
 async def query(
     request: Request, body: QueryRequest, agent: SafeDistrictAgent = Depends(get_agent)
@@ -167,10 +184,10 @@ async def query(
         return await agent.arun(body.question)
     except Exception as exc:
         logger.error("Query failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
-@app.get("/cities")
+@app.get("/cities", dependencies=[Depends(verify_api_key)])
 async def list_cities(
     request: Request, agent: SafeDistrictAgent = Depends(get_agent)
 ) -> list[dict]:
@@ -185,7 +202,7 @@ async def list_cities(
     return pairs
 
 
-@app.get("/cities/{city_name}")
+@app.get("/cities/{city_name}", dependencies=[Depends(verify_api_key)])
 async def city_report(
     request: Request, city_name: str, agent: SafeDistrictAgent = Depends(get_agent)
 ) -> dict:
@@ -198,10 +215,10 @@ async def city_report(
         return await agent.get_city_report(city_name)
     except Exception as exc:
         logger.error("City report failed for %s: %s", city_name, exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
-@app.get("/states")
+@app.get("/states", dependencies=[Depends(verify_api_key)])
 async def list_states(
     request: Request, agent: SafeDistrictAgent = Depends(get_agent)
 ) -> list[str]:
@@ -210,7 +227,7 @@ async def list_states(
     return sorted(df["state"].dropna().unique().tolist())
 
 
-@app.get("/states/{state_name}/cities")
+@app.get("/states/{state_name}/cities", dependencies=[Depends(verify_api_key)])
 async def state_cities(
     request: Request, state_name: str, agent: SafeDistrictAgent = Depends(get_agent)
 ) -> list[dict]:
@@ -230,7 +247,7 @@ async def state_cities(
     return results
 
 
-@app.post("/compare")
+@app.post("/compare", dependencies=[Depends(verify_api_key)])
 async def compare(
     request: Request, body: CompareRequest, agent: SafeDistrictAgent = Depends(get_agent)
 ) -> dict:
@@ -240,10 +257,10 @@ async def compare(
         return await agent.arun(question)
     except Exception as exc:
         logger.error("Compare failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
-@app.get("/anomalies")
+@app.get("/anomalies", dependencies=[Depends(verify_api_key)])
 async def anomalies(
     request: Request, agent: SafeDistrictAgent = Depends(get_agent)
 ) -> list[dict]:
@@ -262,10 +279,10 @@ async def anomalies(
         ]
     except Exception as exc:
         logger.error("Anomaly detection failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
-@app.get("/top-dangerous")
+@app.get("/top-dangerous", dependencies=[Depends(verify_api_key)])
 async def top_dangerous(
     request: Request,
     n: int = Query(default=5, ge=1, le=53),
@@ -286,7 +303,7 @@ async def top_dangerous(
     return results
 
 
-@app.get("/women-safety")
+@app.get("/women-safety", dependencies=[Depends(verify_api_key)])
 async def women_safety(
     request: Request, agent: SafeDistrictAgent = Depends(get_agent)
 ) -> list[dict]:
@@ -314,4 +331,4 @@ async def women_safety(
         return output
     except Exception as exc:
         logger.error("Women safety endpoint failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc

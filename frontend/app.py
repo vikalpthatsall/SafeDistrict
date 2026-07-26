@@ -12,6 +12,10 @@ import plotly.graph_objects as go
 import pandas as pd
 
 BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+# Frontend never imports backend modules (see module docstring), so this
+# reads the env var directly rather than backend.config.get_settings().
+API_KEY = os.getenv("BACKEND_API_KEY", "")
+_AUTH_HEADERS = {"X-API-Key": API_KEY}
 
 # ── Page config ────────────────────────────────────────────────────────────────
 
@@ -361,7 +365,7 @@ def score_color(score: float) -> str:
 
 def _get(path: str, **params):
     try:
-        r = requests.get(f"{BASE_URL}{path}", params=params, timeout=30)
+        r = requests.get(f"{BASE_URL}{path}", params=params, headers=_AUTH_HEADERS, timeout=30)
         r.raise_for_status()
         return r.json()
     except requests.exceptions.ConnectionError:
@@ -374,7 +378,7 @@ def _get(path: str, **params):
 
 def _post(path: str, payload: dict):
     try:
-        r = requests.post(f"{BASE_URL}{path}", json=payload, timeout=60)
+        r = requests.post(f"{BASE_URL}{path}", json=payload, headers=_AUTH_HEADERS, timeout=60)
         r.raise_for_status()
         return r.json()
     except requests.exceptions.ConnectionError:

@@ -14,3 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # setdefault (not direct assignment) means a real key from an actual .env /
 # real environment is never overwritten.
 os.environ.setdefault("GROQ_API_KEY", "test-placeholder-key-not-real")
+
+# backend_api_key is also a required Settings field now (Session 16's API-key
+# auth) — same reasoning as GROQ_API_KEY above.
+os.environ.setdefault("BACKEND_API_KEY", "test-placeholder-api-key-not-real")
