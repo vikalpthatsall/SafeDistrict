@@ -17,7 +17,7 @@ SafeDistrict AI is a safety-focused AI application with a RAG (Retrieval-Augment
 
 **Frontend** — there are **two** Streamlit entry points, not one:
 - `frontend/app.py` — the actual 4-page dashboard UI; calls the backend over HTTP using `BACKEND_URL`.
-- `app.py` (repo root) — Hugging Face Spaces entry point only. It `subprocess.Popen`s `uvicorn backend.main:app` in the background, polls `/health` until ready, then `exec()`s `frontend/app.py` in-process (single Spaces worker, no separate backend URL needed). Don't confuse the two when asked to "run the frontend." Live at https://huggingface.co/spaces/vikalpthatsall/SafeDistrict.
+- `app.py` (repo root) — Hugging Face Spaces entry point only. It `subprocess.Popen`s `uvicorn backend.main:app` in the background, polls `/health` until ready, then `exec()`s `frontend/app.py` in-process (single Spaces worker, no separate backend URL needed). Don't confuse the two when asked to "run the frontend." Live at https://huggingface.co/spaces/vikalpthatsall/SafeDistrict. The Space's `README.md` frontmatter declares `sdk: streamlit`, so HF builds it with its own Streamlit runtime — it does **not** build or run the repo's `Dockerfile` at all, regardless of what's in it.
 
 **Data**:
 - `data/processed/ncrb_2023_verified.py` — hand-verified NCRB 2023 constants (exact murder/rape/kidnapping counts for a subset of cities, state-level crime ratios, national fallback ratios, key findings text). Always committed.
@@ -59,6 +59,7 @@ streamlit run app.py
 ```bash
 docker-compose up --build
 ```
+Untested — no local Docker has been available to verify this in this repo's history, and it is not the deployed Space's path (see Architecture: the Space runs `sdk: streamlit`, which ignores the `Dockerfile` entirely).
 
 ### Run the eval/regression harness
 ```bash

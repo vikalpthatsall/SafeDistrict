@@ -1,3 +1,9 @@
+# NOT used by the deployed Hugging Face Space — that Space's README.md
+# declares `sdk: streamlit`, and Spaces in that mode ignore any Dockerfile
+# present in the repo entirely (they build with HF's own Streamlit runtime
+# instead). This file exists only for local `docker-compose up --build` or a
+# hypothetical future Docker-based deployment. As of this note, it has never
+# been successfully built or run in any environment — see docker-compose.yml.
 FROM python:3.11-slim
 
 # Build tools for C extensions (chromadb, scikit-learn); curl for HEALTHCHECK.
