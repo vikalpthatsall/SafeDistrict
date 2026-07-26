@@ -5,6 +5,16 @@ Embeds NCRB 2023 city crime documents into ChromaDB using free
 HuggingFace embeddings, then answers natural-language safety
 queries via ChatGroq (llama-3.3-70b-versatile).
 
+Retrieval is hybrid (BM25 + vector) with cross-encoder reranking — see
+RAGPipeline.retrieve(). Reranking uses sentence-transformers' CrossEncoder,
+which imports torch unconditionally regardless of its `backend=` argument
+(verified against the installed source, not assumed). requirements.txt
+(dev) already includes torch, but requirements-prod.txt deliberately does
+not (CPU-only ONNX embeddings) — this feature does not currently work
+against the deployed HF Space's production dependency set. That tradeoff
+is intentionally left for a separate decision rather than silently adding
+torch back to requirements-prod.txt here.
+
 Every document carries an inline citation tag:
   [NCRB 2023 verified]                              — exact counts from NCRB tables
   [derived from NCRB 2023 murder rates]              — computed from rate × population
@@ -24,6 +34,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from groq import APIConnectionError, APITimeoutError, RateLimitError
 from langchain_chroma import Chroma
+from langchain_community.retrievers import BM25Retriever
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -42,6 +53,29 @@ _SOURCE_URL = "https://data.opencity.in/dataset/crime-in-india-2023"
 # Transient-looking Groq failures worth retrying — not auth/validation errors,
 # which retrying can't fix.
 _TRANSIENT_GROQ_ERRORS = (APIConnectionError, APITimeoutError, RateLimitError)
+
+# Hybrid retrieval — exact weights from the interview material.
+_VECTOR_WEIGHT = 0.6
+_BM25_WEIGHT = 0.4
+_CANDIDATE_POOL_SIZE = 15
+_FINAL_TOP_K = 5
+_RERANKER_MODEL = "BAAI/bge-reranker-base"
+
+
+def _min_max_normalize(scores: dict[str, float]) -> dict[str, float]:
+    """Scale raw scores to [0, 1].
+
+    BM25 scores are unbounded, unlike Chroma's already-normalized relevance
+    scores — this makes the two comparable before combining them with fixed
+    weights.
+    """
+    if not scores:
+        return {}
+    values = list(scores.values())
+    lo, hi = min(values), max(values)
+    if hi == lo:
+        return dict.fromkeys(scores, 0.0)
+    return {key: (value - lo) / (hi - lo) for key, value in scores.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -187,8 +221,9 @@ _SYSTEM_PROMPT = (
 class RAGPipeline:
     """Retrieval-Augmented Generation pipeline over NCRB 2023 city data.
 
-    Uses ChromaDB for vector storage, HuggingFace embeddings for retrieval,
-    and ChatGroq (llama-3.3-70b-versatile) for answer generation.
+    Uses ChromaDB + HuggingFace embeddings and BM25 for hybrid retrieval,
+    a cross-encoder for reranking (see retrieve()), and ChatGroq
+    (llama-3.3-70b-versatile) for answer generation.
     """
 
     def __init__(
@@ -212,20 +247,32 @@ class RAGPipeline:
             Optional NCRB key findings to embed as an additional context document.
         """
         settings = get_settings()
-        store_exists = Path(persist_dir).exists() and any(Path(persist_dir).iterdir())
 
+        # Computed unconditionally (cheap — pure string formatting) so BM25's
+        # corpus always matches the current df, regardless of whether the
+        # Chroma vector store is freshly built or loaded from disk.
+        documents = build_crime_documents(df)
+        if key_findings:
+            documents.append(build_key_findings_document(key_findings))
+
+        store_exists = Path(persist_dir).exists() and any(Path(persist_dir).iterdir())
         if rebuild or not store_exists:
             print("Building vector store from NCRB documents...")
-            documents = build_crime_documents(df)
-            if key_findings:
-                documents.append(build_key_findings_document(key_findings))
             store = build_vector_store(documents, persist_dir=persist_dir)
             print(f"  {len(documents)} documents embedded -> {persist_dir}")
         else:
             print(f"Loading existing vector store from {persist_dir}")
             store = load_vector_store(persist_dir=persist_dir)
 
-        self.retriever = store.as_retriever(search_kwargs={"k": 5})
+        self.vector_store = store
+        self.bm25_retriever = BM25Retriever.from_texts(documents)
+
+        # See module docstring: requires torch (via sentence-transformers'
+        # CrossEncoder), which is not in requirements-prod.txt.
+        from sentence_transformers import CrossEncoder
+
+        self._cross_encoder = CrossEncoder(_RERANKER_MODEL)
+
         self.llm = ChatGroq(
             model=settings.groq_model,
             api_key=settings.groq_api_key,
@@ -249,6 +296,73 @@ class RAGPipeline:
         """Call the Groq LLM, retrying transient failures up to 4 attempts (1s/2s/4s backoff)."""
         return await self.llm.ainvoke(messages)
 
+    async def _hybrid_search(self, question: str) -> list[dict]:
+        """BM25 + vector search over the full corpus, combined by fixed weights.
+
+        final_score = 0.6 * vector_score + 0.4 * bm25_score (BM25 min-max
+        normalized first, since its raw scores are unbounded).
+
+        Returns
+        -------
+        list[dict]
+            Up to _CANDIDATE_POOL_SIZE {"text", "score"} dicts, score-descending.
+        """
+        corpus_size = len(self.bm25_retriever.docs)
+
+        bm25_raw_scores = self.bm25_retriever.vectorizer.get_scores(
+            self.bm25_retriever.preprocess_func(question)
+        )
+        bm25_by_text = {
+            doc.page_content: float(score)
+            for doc, score in zip(self.bm25_retriever.docs, bm25_raw_scores)
+        }
+        bm25_norm = _min_max_normalize(bm25_by_text)
+
+        vector_hits = await self.vector_store.asimilarity_search_with_relevance_scores(
+            question, k=corpus_size
+        )
+        vector_by_text = {doc.page_content: float(score) for doc, score in vector_hits}
+
+        combined = [
+            {
+                "text": text,
+                "score": _VECTOR_WEIGHT * vector_by_text.get(text, 0.0)
+                + _BM25_WEIGHT * bm25_norm.get(text, 0.0),
+            }
+            for text in bm25_by_text
+        ]
+        combined.sort(key=lambda d: d["score"], reverse=True)
+        return combined[:_CANDIDATE_POOL_SIZE]
+
+    async def _rerank(self, question: str, candidates: list[dict]) -> list[dict]:
+        """Cross-encoder rerank of hybrid-search candidates.
+
+        Each result's score is the cross-encoder's own relevance score,
+        replacing the hybrid retrieval score — the whole point of reranking
+        is that it's more accurate than the initial combination.
+        """
+        if not candidates:
+            return candidates
+        pairs = [(question, c["text"]) for c in candidates]
+        scores = await asyncio.to_thread(self._cross_encoder.predict, pairs)
+        reranked = [
+            {"text": c["text"], "score": float(s)}
+            for c, s in zip(candidates, scores)
+        ]
+        reranked.sort(key=lambda d: d["score"], reverse=True)
+        return reranked
+
+    async def retrieve(self, question: str) -> list[dict]:
+        """Hybrid BM25+vector retrieval, reranked to the final top _FINAL_TOP_K.
+
+        Internal seam: aquery()/acompare_query() only see the returned
+        {"text", "score"} dicts and never need to know retrieval uses
+        hybrid search + reranking internally.
+        """
+        candidates = await self._hybrid_search(question)
+        reranked = await self._rerank(question, candidates)
+        return reranked[:_FINAL_TOP_K]
+
     async def aquery(self, question: str) -> dict:
         """Answer a natural-language safety question using RAG.
 
@@ -262,8 +376,8 @@ class RAGPipeline:
         dict
             Keys: question, answer, sources, num_sources, data_citation, source_url.
         """
-        retrieved = await self.retriever.ainvoke(question)
-        doc_texts = [doc.page_content for doc in retrieved]
+        results = await self.retrieve(question)
+        doc_texts = [r["text"] for r in results]
         context = "\n\n".join(doc_texts)
 
         messages = [

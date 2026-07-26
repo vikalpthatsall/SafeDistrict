@@ -1,3 +1,13 @@
+# Torch is a hard dependency either way (sentence-transformers requires it
+# regardless of runtime backend, and rag_pipeline.py's cross-encoder reranker
+# needs it directly) — pin the genuinely CPU-only wheel from PyTorch's own
+# index rather than plain PyPI. Verified: plain `torch==2.11.0` resolves to a
+# ~530MB manylinux wheel with CUDA bundled in; download.pytorch.org/whl/cpu
+# publishes the same 2.11.0 version as a ~190MB CPU-only build (`+cpu`).
+# --extra-index-url (not --index-url) so other packages still resolve from
+# PyPI normally.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # API
 fastapi==0.136.0
 uvicorn==0.44.0
@@ -10,6 +20,7 @@ anthropic==0.96.0
 groq==0.37.1
 langchain==1.2.15
 langchain-core==1.3.0
+langchain-community==0.4.1
 langchain-anthropic==1.4.1
 langchain-groq==1.1.2
 langchain-chroma==1.1.0
@@ -17,12 +28,18 @@ langchain-huggingface==1.2.2
 langgraph==1.1.8
 langgraph-prebuilt==1.0.10
 
+# Retrieval — hybrid search (BM25Retriever needs langchain-community above)
+rank_bm25==0.2.2
+
 # Vector DB
 chromadb==1.5.8
 
-# Embeddings — CPU-only, no torch; sentence-transformers uses ONNX runtime
+# Embeddings + reranking — sentence-transformers pulls in torch regardless of
+# backend=; onnxruntime is still used for the embedding model's ONNX backend,
+# but the cross-encoder reranker (rag_pipeline.py) requires actual torch.
 sentence-transformers==5.4.1
 onnxruntime==1.24.4
+torch==2.11.0+cpu
 
 # Data
 pandas==3.0.2
