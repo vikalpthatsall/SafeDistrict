@@ -1,0 +1,637 @@
+/* Hallmark · shape: app screen · genre: atmospheric · theme: Ribbon (deal 2/3, seed crime-safety-figures-people-56) · redesign: full
+ * nav: kept st.tabs in one top row with the serif wordmark · signature: the safety scale · states: loading, empty, error, disabled, tie · ribbon: two-in-the-morning re-keyed to the user's reference, Instrument Serif display by request
+ * axes: dark/high-contrast-serif/chromatic-ember · posture: full-palette · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E3 S4 R4 V5 · weakest: E, Streamlit's widgets are styled from outside their own CSS; every override targets a data-testid read from the live DOM, swept at 1440, 390 and 375 */
+/* Hallmark · dropped 397.5401.4418516521611.7626.7767.7916.71832.6050010001500, 46.392.3020406080 · the two Plotly charts' run-together label text; each value now sits in its own table cell */
+/* Hallmark · finish-review: subagent · 8 findings · 7 resolved, 1 partial · gap: at phone width the default Compare pair showed one index line, Ahmedabad's cap painted over Bengaluru's; the reviewer's fix (caps centred by margin, index lines raised inside an isolated slot) applied after scoring, checked by hit test at 375, 390 and 1440, not re-reviewed */
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("./tokens.css");
+@import url("./base.css");
+
+/* ── Base ── */
+.stApp {
+  background:
+    var(--grain) 0 0 / 160px 160px,
+    radial-gradient(ellipse 40% 35% at 50% 0%, var(--bloom-light), transparent),
+    radial-gradient(ellipse 40% 35% at 50% 100%, var(--bloom-accent), transparent),
+    var(--color-paper);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+.stApp [data-testid="stAppViewContainer"],
+.stApp [data-testid="stMain"],
+.stApp [data-testid="stMainBlockContainer"],
+.stApp [data-testid="stBottomBlockContainer"] { background: transparent; }
+.stApp :is(h1, h2, h3, h4) { padding: 0; }
+.stApp code { font-family: var(--font-outlier); }
+
+/* ── Hide sidebar and Streamlit chrome ── */
+.stApp [data-testid="stSidebar"],
+.stApp [data-testid="stSidebarCollapsedControl"],
+.stApp [data-testid="stExpandSidebarButton"],
+.stApp [data-testid="stDecoration"],
+.stApp [data-testid="stAppDeployButton"],
+.stApp [data-testid="stMainMenu"],
+.stApp [data-testid="stToolbarActions"]:not(:has([data-testid="stStatusWidget"])),
+.stApp footer { display: none; }
+.stApp [data-testid="stHeader"],
+.stApp [data-testid="stHeader"] * { background: transparent; pointer-events: none; }
+.stApp [data-testid="stStatusWidget"] {
+  position: fixed;
+  inset: auto var(--space-md) var(--space-md) auto;
+  z-index: var(--z-toast);
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-3);
+  box-shadow: var(--shadow-part);
+  color: var(--color-ink-2);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+.stApp [data-testid="stStatusWidget"],
+.stApp [data-testid="stStatusWidget"] * { pointer-events: auto; }
+.stApp [data-testid="stElementContainer"]:has([data-testid="stHtml"] style) { display: none; }
+
+/* ── Main container ── */
+.stApp [data-testid="stMainBlockContainer"] {
+  max-width: var(--container);
+  margin-inline: auto;
+  padding: var(--space-md) var(--gutter) var(--space-3xl);
+}
+.stApp [data-testid="stMain"]:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+/* ── Wordmark and tabs, a top nav bar ── */
+.stApp [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .sd-wordmark) { position: relative; }
+.stApp [data-testid="stElementContainer"]:has(.sd-wordmark) {
+  position: absolute;
+  inset: 0 auto auto 0;
+  inline-size: auto;
+  block-size: var(--bar-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  pointer-events: none;
+  z-index: var(--z-raised);
+}
+.stApp .sd-wordmark {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  letter-spacing: var(--tracking-display);
+  line-height: 1;
+  white-space: nowrap;
+}
+.stApp [data-testid="stTabs"] [data-baseweb="tab-list"] {
+  align-items: stretch;
+  gap: 0;
+  min-block-size: var(--bar-h);
+  padding-inline-start: calc(var(--space-4xl) + var(--space-2xl));
+  background: transparent;
+}
+.stApp [data-baseweb="tab-list"]:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.stApp [data-baseweb="tab"] {
+  position: relative;
+  flex: none;
+  block-size: var(--bar-h);
+  margin: 0;
+  padding: 0 var(--space-sm);
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color var(--dur-micro) var(--ease-out);
+}
+.stApp [data-baseweb="tab"]:first-child { margin-inline-start: auto; }
+/* a tab never shrinks or breaks a word; on a narrow phone the row scrolls sideways instead */
+.stApp [data-baseweb="tab"] p { margin: 0; color: inherit; font: inherit; white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+.stApp [data-baseweb="tab"]::after {
+  content: "";
+  position: absolute;
+  inset: auto var(--space-sm) 0;
+  block-size: 2px;
+  background: var(--color-accent);
+  opacity: 0;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.stApp [data-baseweb="tab"][aria-selected="true"] { color: var(--color-ink); }
+.stApp [data-baseweb="tab"][aria-selected="true"]::after { opacity: 1; }
+@media (hover: hover) { .stApp [data-baseweb="tab"]:hover { color: var(--color-ink); } }
+.stApp [data-baseweb="tab"]:active { color: var(--color-ink-2); }
+.stApp [data-baseweb="tab"]:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+/* Remove Streamlit's default tab underline indicator; the accent bar above replaces it */
+.stApp [data-baseweb="tab-highlight"] { display: none; }
+.stApp [data-baseweb="tab-border"] { block-size: 1px; background: var(--color-rule); }
+.stApp [data-baseweb="tab-panel"] { padding: var(--space-xl) 0 0; }
+
+/* ── Page title and type ── */
+.stApp .sd-title {
+  max-width: 20ch;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--tracking-display);
+  line-height: 1.04;
+}
+.stApp .sd-display {
+  max-width: 24ch;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--tracking-display);
+  line-height: 1.08;
+}
+/* City Explorer: the city is the screen's subject, so it takes the larger head and the tab's title steps down */
+.stApp .sd-pagehead-quiet .sd-title { font-size: var(--text-3xl); }
+.stApp .sd-cityhead .sd-display { font-size: var(--text-4xl); }
+.stApp .sd-h {
+  max-width: none;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+.stApp .sd-meta { max-width: 65ch; color: var(--color-muted); font-size: var(--text-md); }
+.stApp :is(.sd-sub, .sd-note, .sd-help) { max-width: 65ch; color: var(--color-muted); font-size: var(--text-sm); }
+.stApp .sd-label { color: var(--color-ink-2); font-size: var(--text-sm); font-weight: 500; }
+.stApp .sd-prose { max-width: 65ch; color: var(--color-ink-2); line-height: 1.65; }
+.stApp .sd-prose strong { color: var(--color-ink); font-weight: 500; }
+.stApp .sd-notice {
+  max-width: none;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-part);
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+
+/* ── Layout ── */
+.stApp .sd-pagehead { display: flex; flex-direction: column; gap: var(--space-xs); padding-bottom: var(--space-md); }
+.stApp .sd-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-lg) var(--space-2xl);
+  margin-bottom: var(--space-xl);
+}
+.stApp .sd-head .sd-pagehead { padding-bottom: 0; }
+.stApp .sd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  align-items: start;
+  gap: var(--space-2xl) var(--gap-columns);
+  margin-top: var(--space-2xl);
+}
+.stApp .sd-col { display: flex; flex-direction: column; gap: var(--space-2xl); min-width: 0; }
+.stApp .sd-block { display: flex; flex-direction: column; gap: var(--space-2xs); min-width: 0; }
+.stApp .sd-block .sd-note { margin-top: var(--space-sm); }
+.stApp .sd-section { margin-top: var(--space-xl); }
+.stApp .sd-section .sd-prose { margin-top: var(--space-xs); }
+.stApp .sd-cityhead { display: flex; flex-direction: column; gap: var(--space-xs); margin-block: var(--space-md) var(--space-lg); }
+.stApp .sd-citymeta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); color: var(--color-muted); font-size: var(--text-sm); }
+.stApp .sd-readout { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-2xl); }
+.stApp .sd-panel.sd-readout { margin-bottom: var(--space-lg); }
+.stApp .sd-verdict { display: flex; flex-direction: column; gap: var(--space-xs); }
+.stApp .sd-verdict .sd-readout { margin-top: var(--space-lg); }
+
+/* ── Panel (card), machined and lit from above, with the night's grain in its face ── */
+.stApp .sd-panel,
+.stApp [class*="st-key-panel_"] {
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--grain) 0 0 / 160px 160px, linear-gradient(var(--color-paper-3), var(--color-paper-2));
+  box-shadow: var(--edge-light), var(--shadow-panel);
+}
+
+/* ── Score display ── */
+.stApp .sd-stats { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-md) 0; }
+.stApp .sd-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding-inline: var(--space-xl);
+  border-inline-start: 1px solid var(--color-rule);
+}
+.stApp .sd-stat:first-child { padding-inline-start: 0; border-inline-start: 0; }
+.stApp .sd-stat:last-child { padding-inline-end: 0; }
+.stApp .sd-stat-label { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--color-ink-2); font-size: var(--text-sm); font-weight: 500; }
+/* big figures take the display face, lining and tabular, as Ribbon sets its levels */
+.stApp .sd-figure-value {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: var(--display-weight);
+  letter-spacing: var(--tracking-display);
+  line-height: 1;
+}
+.stApp .sd-stat-hint { color: var(--color-muted); font-size: var(--text-sm); }
+
+/* ── The safety scale ── */
+.stApp [data-tone="safe"] { --tone: var(--color-safe); }
+.stApp [data-tone="mid"] { --tone: var(--color-mid); }
+.stApp [data-tone="risk"] { --tone: var(--color-risk); }
+.stApp [data-tone="ink"] { --tone: var(--color-ink); }
+.stApp [data-tone="dim"] { --tone: color-mix(in oklab, var(--color-mid) 55%, var(--color-well)); }
+.stApp .sd-swatch { flex: none; inline-size: 10px; block-size: 10px; border-radius: var(--radius-mark); background: var(--tone, var(--color-mid)); }
+.stApp .sd-scale { display: flex; flex-direction: column; gap: var(--space-sm); min-width: 0; margin: 0; }
+.stApp .sd-scale-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2xs) var(--space-md); }
+.stApp .sd-scale-title { color: var(--color-ink); font-size: var(--text-md); font-weight: 500; }
+.stApp .sd-scale-hint { color: var(--color-muted); font-size: var(--text-sm); }
+.stApp .sd-legend { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-md); margin-inline-start: auto; }
+.stApp .sd-key { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--color-ink-2); font-size: var(--text-sm); }
+.stApp .sd-scale-body { display: flex; flex-direction: column; gap: var(--space-xs); }
+.stApp .sd-scale-row { position: relative; block-size: var(--space-lg); margin-inline: var(--space-sm); }
+.stApp .sd-scale-label {
+  position: absolute;
+  inset-inline-start: var(--x);
+  top: 0;
+  color: var(--tone);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.stApp .sd-scale-row[data-row="below"] .sd-scale-label { top: auto; bottom: 0; }
+.stApp .sd-scale-label[data-align="start"] { transform: none; }
+.stApp .sd-scale-label[data-align="end"] { transform: translateX(-100%); }
+.stApp .sd-scale-label:is([data-tone="mid"], [data-tone="dim"]) { color: var(--color-ink-2); }
+.stApp .sd-scale-label .sd-num { font-variant-numeric: tabular-nums; }
+.stApp .sd-slot { position: relative; isolation: isolate; block-size: var(--space-xl); border-radius: var(--radius-part); background: var(--color-well); box-shadow: var(--shadow-well); }
+.stApp .sd-track { position: absolute; inset: 0 var(--space-sm); }
+.stApp .sd-half { position: absolute; inset-block: 0; inset-inline-start: 50%; inline-size: 1px; background: color-mix(in oklab, var(--color-muted) 40%, transparent); }
+/* each tick is an 8px target for its title, the city and its score; the 2px line is drawn centred inside it */
+.stApp .sd-tick {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--x);
+  inline-size: var(--space-xs);
+  transform: translateX(-50%);
+}
+.stApp .sd-tick::before {
+  content: "";
+  position: absolute;
+  inset-block: var(--space-xs);
+  inset-inline-start: 50%;
+  inline-size: 2px;
+  border-radius: var(--radius-mark);
+  background: var(--tone);
+  transform: translateX(-50%);
+}
+@media (hover: hover) { .stApp .sd-tick:hover::before { background: var(--color-ink); } }
+/* a named city sits on a machined cap, Ribbon's .cap: metal lit from above, its index line lit in the city's tone */
+.stApp .sd-index {
+  position: absolute;
+  inset-block: calc(-1 * var(--space-2xs));
+  inset-inline-start: var(--x);
+  inline-size: var(--space-md);
+  border-radius: var(--radius-part);
+  background: linear-gradient(var(--metal-hi), var(--metal-lo));
+  box-shadow: var(--edge-light), var(--shadow-part);
+  /* centred by margin, not transform, so a cap makes no stacking context and every index line can sit above every cap */
+  margin-inline-start: calc(var(--space-md) / -2);
+}
+.stApp .sd-index::before {
+  content: "";
+  position: absolute;
+  z-index: var(--z-base);
+  inset-block: var(--space-xs);
+  inset-inline-start: 50%;
+  inline-size: 2px;
+  border-radius: var(--radius-mark);
+  background: var(--tone);
+  transform: translateX(-50%);
+}
+/* City Explorer: the sunk slot fills from its edge up to the city's level, in the city's tone */
+.stApp .sd-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(-1 * var(--space-sm));
+  inline-size: calc(var(--x) + var(--space-sm));
+  border-radius: var(--radius-part) 0 0 var(--radius-part);
+  background: linear-gradient(to right, color-mix(in oklab, var(--tone) 4%, transparent), color-mix(in oklab, var(--tone) 28%, transparent));
+}
+.stApp .sd-axis {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  margin-inline: var(--space-sm);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.stApp .sd-axis > :first-child { justify-self: start; }
+.stApp .sd-axis > :last-child { justify-self: end; }
+
+/* ── Stats table rows ── */
+.stApp .sd-table-wrap { overflow-x: auto; margin-top: var(--space-sm); }
+.stApp .sd-table-wrap:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.stApp .sd-table { inline-size: 100%; border-collapse: collapse; color: var(--color-ink-2); font-size: var(--text-sm); line-height: 1.35; }
+.stApp .sd-table th {
+  padding: 0 var(--space-sm) var(--space-xs);
+  border: 0;
+  border-bottom: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-muted);
+  font-weight: 500;
+  text-align: start;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+.stApp .sd-table td { padding: var(--space-xs) var(--space-sm); border: 0; border-bottom: 1px solid var(--color-rule-2); background: transparent; vertical-align: middle; }
+.stApp .sd-table :is(th, td):first-child { padding-inline-start: 0; }
+.stApp .sd-table :is(th, td):last-child { padding-inline-end: 0; }
+.stApp .sd-table .sd-end { text-align: end; }
+.stApp .sd-table .sd-value { color: var(--color-ink); font-family: var(--font-outlier); }
+.stApp .sd-rank { color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.stApp .sd-city { display: block; color: var(--color-ink); font-weight: 500; }
+.stApp .sd-city .sd-tag { margin-inline-start: var(--space-xs); }
+.stApp .sd-state { display: block; color: var(--color-muted); font-size: var(--text-xs); }
+.stApp .sd-table .sd-bar-col { position: relative; inline-size: 38%; min-inline-size: 9rem; padding-inline: 0; }
+.stApp .sd-bar { display: block; inline-size: var(--w); block-size: 8px; border-radius: 0 var(--radius-mark) var(--radius-mark) 0; background: var(--tone, var(--color-ink-2)); }
+.stApp .sd-bar-avg { position: absolute; inset-block: 0; inset-inline-start: var(--x); inline-size: 1px; background: var(--color-muted); }
+.stApp .sd-avg-head {
+  position: relative;
+  display: inline-block;
+  inset-inline-start: var(--x);
+  max-inline-size: calc(100% - var(--x));
+  padding-inline-start: var(--space-xs);
+  border-inline-start: 1px solid var(--color-muted);
+  white-space: normal;
+}
+
+/* ── Tags / badges ── */
+.stApp .sd-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-3xs) var(--space-xs);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-part);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.stApp .sd-table .sd-tag { font-size: var(--text-xs); }
+.stApp .sd-tag[data-state] { border-color: color-mix(in oklab, var(--color-accent) 55%, var(--color-rule)); color: var(--color-ink); }
+
+/* ── City statistics ── */
+.stApp .sd-dl { margin: var(--space-sm) 0 0; padding: 0; }
+.stApp .sd-dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-md); padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-rule-2); }
+.stApp .sd-dl dt { color: var(--color-ink-2); font-size: var(--text-sm); font-weight: 500; }
+.stApp .sd-dl dd { margin: 0; color: var(--color-ink); text-align: end; }
+.stApp .sd-dl .sd-value { font-family: var(--font-outlier); font-variant-numeric: tabular-nums; }
+.stApp .sd-missing { color: var(--color-muted); font-family: var(--font-body); font-size: var(--text-sm); }
+
+/* ── Sources and the offline card ── */
+.stApp .sd-sources { display: flex; flex-direction: column; gap: var(--space-sm); margin: 0; padding: 0; list-style: none; }
+.stApp .sd-sources li { display: flex; flex-direction: column; gap: var(--space-3xs); padding-bottom: var(--space-sm); border-bottom: 1px solid var(--color-rule-2); color: var(--color-ink-2); font-size: var(--text-sm); }
+.stApp .sd-sources li:last-child { padding-bottom: 0; border-bottom: 0; }
+.stApp .sd-source-city { color: var(--color-ink); font-weight: 500; }
+.stApp .sd-source-tier { margin-inline-start: var(--space-xs); color: var(--color-muted); font-weight: 400; }
+.stApp .sd-offline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-card);
+  background: color-mix(in oklab, var(--color-error) 10%, var(--color-paper-2));
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+.stApp .sd-offline p { margin: 0; }
+.stApp .sd-offline .sd-offline-title { color: var(--color-ink); font-size: var(--text-md); font-weight: 500; }
+.stApp .sd-offline code { padding: var(--space-3xs) var(--space-2xs); border-radius: var(--radius-mark); background: var(--color-well); color: var(--color-ink); font-size: var(--text-sm); }
+
+/* ── Widget labels and fonts ── */
+.stApp :is([data-testid="stMarkdownContainer"], [data-testid="stWidgetLabel"], [data-baseweb="select"], [data-testid="stExpander"] summary, [data-testid="stAlertContainer"], [data-testid="stSpinner"]) { font-family: var(--font-body); }
+.stApp [data-testid="stWidgetLabel"] p { color: var(--color-ink-2); font-family: var(--font-body); font-size: var(--text-sm); font-weight: 500; }
+.stApp [data-testid="InputInstructions"] { color: var(--color-muted); font-family: var(--font-body); font-size: var(--text-xs); }
+
+/* ── Buttons ── */
+.stApp .stButton button[data-testid^="stBaseButton"] {
+  position: relative;
+  min-block-size: var(--control-h);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(var(--color-paper-3), var(--color-paper-2));
+  box-shadow: var(--edge-light), var(--shadow-part);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+}
+.stApp .stButton button[data-testid^="stBaseButton"] p { margin: 0; color: inherit; font: inherit; white-space: nowrap; }
+.stApp .stButton button[data-testid^="stBaseButton"]::after { content: ""; position: absolute; inset: -2px 0; }
+@media (hover: hover) {
+  .stApp .stButton button[data-testid^="stBaseButton"]:hover:not(:disabled) { border-color: var(--color-field); color: var(--color-ink); }
+}
+.stApp .stButton button[data-testid^="stBaseButton"]:active:not(:disabled) { transform: translateY(1px); }
+.stApp .stButton button[data-testid^="stBaseButton"]:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+/* disabled reads on three channels, fill, ink and cursor; this rule outranks the primary fill below */
+.stApp .stButton button[data-testid^="stBaseButton"]:disabled {
+  border-color: var(--color-rule);
+  background: var(--color-paper-2);
+  box-shadow: none;
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+.stApp .stButton button[data-testid="stBaseButton-primary"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--color-ink) 35%, transparent), var(--shadow-part);
+  color: var(--color-accent-ink);
+}
+@media (hover: hover) {
+  .stApp .stButton button[data-testid="stBaseButton-primary"]:hover:not(:disabled) {
+    border-color: color-mix(in oklab, var(--color-accent) 86%, var(--color-ink));
+    background: color-mix(in oklab, var(--color-accent) 86%, var(--color-ink));
+    color: var(--color-accent-ink);
+  }
+}
+
+/* ── Select box ── */
+.stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+  min-block-size: var(--control-h);
+  padding-inline: var(--space-xs) var(--space-2xs);
+  border: 1px solid var(--color-field);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+.stApp [data-baseweb="select"] > div * { color: var(--color-ink); }
+.stApp [data-baseweb="select"] svg { color: var(--color-muted); fill: var(--color-muted); }
+@media (hover: hover) { .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div:hover { background: var(--color-paper-3); } }
+.stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div:active { background: var(--color-paper-3); }
+.stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div:has(input:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+/* the control above carries the ring, so the combobox input inside it does not draw a second one */
+.stApp [data-baseweb="select"] input:focus-visible { outline-style: none; }
+/* text typed into the search takes the control's Figtree, not the browser's input face */
+.stApp [data-baseweb="select"] input { font: inherit; }
+.stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div:has(input:disabled) { border-color: var(--color-rule); background: var(--color-paper); cursor: not-allowed; }
+.stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div:has(input:disabled) * { color: var(--color-muted); }
+
+/* ── Select dropdown (portalled outside .stApp), lifted like the theme's panels: a lit top edge and a shadow, no border ── */
+[data-baseweb="popover"] > div {
+  overflow: hidden;
+  border-radius: var(--radius-part);
+  background: var(--color-paper-3);
+  box-shadow: var(--edge-light), var(--shadow-panel);
+}
+[data-baseweb="popover"] > div > div,
+[data-baseweb="popover"] ul { background: transparent; }
+[data-baseweb="popover"] li[role="option"] { background: transparent; color: var(--color-ink); font-family: var(--font-body); font-size: var(--text-sm); }
+[data-baseweb="popover"] li[role="option"][aria-selected="true"] { background: var(--color-accent-soft); }
+@media (hover: hover) { [data-baseweb="popover"] li[role="option"]:hover { background: var(--color-rule); } }
+
+/* ── Text area ── */
+.stApp [data-testid="stTextArea"] [data-baseweb="textarea"] {
+  border: 1px solid var(--color-field);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-2);
+}
+.stApp [data-testid="stTextArea"] [data-baseweb="base-input"] { background: transparent; }
+.stApp [data-testid="stTextArea"] textarea {
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  color: var(--color-ink);
+  caret-color: var(--color-accent);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  line-height: 1.55;
+  resize: vertical;
+}
+.stApp [data-testid="stTextArea"] textarea::placeholder { color: var(--color-muted); opacity: 1; }
+.stApp [data-testid="stTextArea"] textarea:focus-visible { border-radius: calc(var(--radius-card) - 1px); outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.stApp [data-testid="stTextArea"] textarea:disabled { color: var(--color-muted); cursor: not-allowed; }
+
+/* ── Expanders ── */
+.stApp [data-testid="stExpander"] details { border: 1px solid var(--color-rule); border-radius: var(--radius-card); background: transparent; }
+.stApp [data-testid="stExpander"] summary {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-card);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: color var(--dur-micro) var(--ease-out);
+}
+.stApp [data-testid="stExpander"] summary p { color: inherit; font: inherit; }
+.stApp [data-testid="stExpander"] summary :is(svg, [data-testid="stIconMaterial"]) { color: var(--color-muted); fill: var(--color-muted); }
+@media (hover: hover) { .stApp [data-testid="stExpander"] summary:hover { color: var(--color-ink); } }
+.stApp [data-testid="stExpander"] summary:active { color: var(--color-ink); }
+.stApp [data-testid="stExpander"] summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.stApp [data-testid="stExpanderDetails"] { padding: 0 var(--space-md) var(--space-md); }
+
+/* ── Alerts and spinner ── */
+.stApp [data-testid="stAlertContainer"] { padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-rule); border-radius: var(--radius-part); background: var(--color-paper-2); color: var(--color-ink); }
+/* Streamlit pulls the alert's text up by a paragraph margin that base.css already removed */
+.stApp [data-testid="stAlertContainer"] [data-testid="stMarkdownContainer"] { margin-bottom: 0; }
+/* a warning or an error is tinted with its own colour, border and fill, and keeps ink text for contrast */
+.stApp [data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) { border-color: var(--color-warning); background: color-mix(in oklab, var(--color-warning) 10%, var(--color-paper-2)); }
+.stApp [data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) { border-color: var(--color-error); background: color-mix(in oklab, var(--color-error) 10%, var(--color-paper-2)); }
+.stApp [data-testid="stAlertContainer"] p { color: var(--color-ink); font-size: var(--text-sm); }
+.stApp [data-testid="stSpinner"] { color: var(--color-muted); font-size: var(--text-sm); }
+.stApp [data-testid="stSpinner"] p { color: inherit; font: inherit; }
+.stApp [data-testid="stSpinner"] i { border-color: var(--color-rule); border-top-color: var(--color-accent); }
+
+/* ── Plotly chart toolbars ── */
+.stApp .js-plotly-plot .plotly .modebar-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.stApp [data-testid="stElementToolbar"] button { color: var(--color-muted); }
+.stApp [data-testid="stElementToolbar"] button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* ── Keyed layouts ── */
+/* st.columns(gap="medium") sets the column gap; Streamlit sizes columns from it */
+.stApp .st-key-city_pick { max-inline-size: 24rem; }
+.stApp .st-key-examples { flex-wrap: wrap; gap: var(--space-xs); }
+.stApp .st-key-examples:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+/* below about 1408px the four example questions cannot share one row; a full-width break after
+   the second sets them two by two, so none sits alone, and the row gap is halved because the
+   break is a line of its own */
+@media (max-width: 88rem) {
+  .stApp .st-key-examples { row-gap: var(--space-2xs); }
+  .stApp .st-key-examples::before { content: ""; flex-basis: 100%; order: 1; }
+  .stApp .st-key-examples > :nth-child(n + 3) { order: 2; }
+}
+/* on a phone they become one row that scrolls sideways, bled to the screen's edges so the cut-off
+   pill reads as the cue; the padding keeps the first pill on the column edge and gives the focus ring room */
+@media (max-width: 48rem) {
+  .stApp .st-key-examples {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    inline-size: calc(100% + 2 * var(--gutter));
+    max-inline-size: none;
+    margin-inline: calc(-1 * var(--gutter));
+    padding: var(--space-2xs) var(--gutter);
+    scroll-padding-inline: var(--gutter);
+  }
+  .stApp .st-key-examples::before { content: none; }
+  .stApp .st-key-examples > [data-testid="stElementContainer"] { max-inline-size: none; }
+}
+.stApp .st-key-ask_row { gap: var(--space-md); }
+
+/* ── AI assessment block ── */
+.stApp [class*="st-key-panel_"] [data-testid="stMarkdownContainer"] { color: var(--color-ink-2); }
+.stApp [class*="st-key-panel_"] [data-testid="stMarkdownContainer"] p { max-width: 65ch; margin: 0 0 var(--space-sm); line-height: 1.65; }
+.stApp [class*="st-key-panel_"] [data-testid="stMarkdownContainer"] :is(h1, h2, h3, h4) {
+  max-width: none;
+  padding: var(--space-sm) 0 var(--space-2xs);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+.stApp [data-testid="stMarkdownContainer"] strong { color: var(--color-ink); font-weight: 500; }
+.stApp [data-testid="stMarkdownContainer"] a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.16em; }
+@media (hover: hover) { .stApp [data-testid="stMarkdownContainer"] a:hover { color: var(--color-ink); text-decoration-color: var(--color-accent); } }
+.stApp [data-testid="stMarkdownContainer"] a:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* ── Narrow screens ── */
+@media (max-width: 60rem) {
+  .stApp .sd-grid,
+  .stApp .sd-readout { grid-template-columns: minmax(0, 1fr); }
+  .stApp .sd-readout { gap: var(--space-lg); }
+}
+@media (max-width: 48rem) {
+  .stApp [data-testid="stElementContainer"]:has(.sd-wordmark) { position: static; block-size: auto; }
+  .stApp [data-testid="stTabs"] [data-baseweb="tab-list"] { overflow-x: auto; padding-inline-start: 0; }
+  /* tighter tabs fit the row down to about 340px; the first label sits on the column edge under the wordmark */
+  .stApp [data-baseweb="tab"] { padding-inline: var(--space-xs); }
+  .stApp [data-baseweb="tab"]::after { inset-inline: var(--space-xs); }
+  .stApp [data-baseweb="tab"]:first-child { margin-inline-start: 0; padding-inline-start: 0; }
+  .stApp [data-baseweb="tab"]:first-child::after { inset-inline-start: 0; }
+  .stApp .sd-title { font-size: var(--text-3xl); }
+  .stApp .sd-display { font-size: var(--text-2xl); }
+  .stApp .sd-pagehead-quiet .sd-title { font-size: var(--text-2xl); }
+  .stApp .sd-cityhead .sd-display { font-size: var(--text-3xl); }
+  .stApp .sd-stat { padding-inline: var(--space-lg); }
+}
+@media (max-width: 40rem) {
+  .stApp .sd-table .sd-bar-col { min-inline-size: 6rem; }
+  .stApp .sd-figure-value { font-size: var(--text-2xl); }
+  /* the average marker's head steps down a size so it stays on one line in the narrow bar column */
+  .stApp .sd-avg-head { font-size: var(--text-xs); }
+  /* stats share one row in equal columns, so a long hint wraps inside its own column */
+  .stApp .sd-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .stApp .sd-stat { padding-inline: var(--space-md); }
+}
