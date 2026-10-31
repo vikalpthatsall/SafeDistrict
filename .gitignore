@@ -15,3 +15,6 @@ chromadb/
 
 # Output of an unrelated codebase-graphing tool — not part of the app
 graphify-out/
+
+# Hallmark design-run output (screenshots, before/after records) — not part of the app
+.hallmark/
