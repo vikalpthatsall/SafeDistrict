@@ -1,3 +1,10 @@
+# The Space runs Hugging Face's default Python 3.10 (the README front matter
+# sets no python_version), and app.py starts the backend with that same
+# interpreter. ruff 0.17 otherwise assumes 3.11+ and asks for 3.11-only
+# syntax such as datetime.UTC (UP017), which would stop the backend starting
+# on the Space.
+target-version = "py310"
+
 # B008 ("function call in argument default") is a documented false positive
 # for FastAPI's Depends()/Query() pattern — FastAPI calls these once at route
 # registration, not per-request, and the entire DI system is built around
